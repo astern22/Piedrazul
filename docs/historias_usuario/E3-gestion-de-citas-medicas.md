@@ -45,5 +45,19 @@ Configuración de la disponibilidad médica, agendamiento autónomo y cancelaci�
 | Código | Título | Contexto | Evento | Resultado esperado |
 |---|---|---|---|---|
 | `E3-HU03-CA01` | Cancelacion de cita correcta por obligatoriedad | En caso que inicie sesion de usuario como PACIENTE, y me encuentre en el menu principal | Cuando intento cancelar una cita medica con al menos dos dias de anticipacion, y con la justificacion diligenciada | El sistema debe informar que la cita quedo cancelada correctamente. |
-| `E3-HU03-CA02` | Falla por cambios obligatorios | En caso que el paciente autenticado NO diligencie la justificacion de la cancelacion de la cita medica | Cuando intenta cancelar la cita | El sistema debe impedir la cancelacion de la cita medica y mostrar un mensaje indicando que la justificacion es obligatoria |
+| `E3-HU03-CA02` | Falla por campos obligatorios | En caso que el paciente autenticado NO diligencie la justificacion de la cancelacion de la cita medica | Cuando intenta cancelar la cita | El sistema debe impedir la cancelacion de la cita medica y mostrar un mensaje indicando que la justificacion es obligatoria |
 | `E3-HU03-CA03` | Falla por anticipacion invalida | En caso que el plazo de la cita es menor a dos dias | Cuando intenta cancelar la cita | El sistema debe impedir la cancelacion de la cita medica y mostrar un mensaje indicando que ya no se puede cancelar la cita en los plazos actuales |
+
+### E3-HU04 — Reagendamiento de citas
+
+| Código | Rol | Quiero | Para |
+|---|---|---|---|
+| `E3-HU03` | Como un MEDICO/TERAPISTA | reagendar una cita medica | cambiar la fecha y hora de atencion. |
+
+#### Criterios de aceptación
+
+| Código | Título | Contexto | Evento | Resultado esperado |
+|---|---|---|---|---|
+| `E3-HU04-CA01` | Reagendamiento de de cita correcta por obligatoriedad | En caso que inicie sesion de usuario como MEDICO/AGENDADOR, y me encuentre en el menu principal | Cuando intento reagendar una cita medica seleccionando una nueva fecha no anterior a la fecha actual | El sistema debe informar que la cita quedo reagendada correctamente. |
+| `E3-HU04-CA02` | Falla por campos obligatorios | En caso que el MEDICO/TERAPISTA autenticado NO seleccione una fecha | Cuando intenta reagendar la cita | El sistema debe impedir el reagendamiento de la cita medica y mostrar un mensaje indicando que la nueva fecha es obligatoria. |
+| `E3-HU04-CA03` | Falla por fecha y hora invalida | En caso que el MEDICO/TERAPISTA autenticado seleccione una fecha donde no se tiene horario de atencion libre  | Cuando intenta reagendar la cita | El sistema debe impedir el reagendamiento de la cita medica y mostrar un mensaje indicando que la fecha no existe o ya esta ocupada |
