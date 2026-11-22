@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.users.application;
 
 import java.util.Optional;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEntity;
@@ -37,8 +38,7 @@ public class RegisterUserService {
 
         String documentNumber = request.documentNumber().trim();
 
-        Optional<PatientEntity> existingPatient =
-                patientRepository.findByDocumentNumber(documentNumber);
+        Optional<PatientEntity> existingPatient = patientRepository.findByDocumentNumber(documentNumber);
 
         if (existingPatient.isPresent() && existingPatient.get().getUserId() != null) {
             throw new RuntimeException("Ya existe una cuenta asociada a este numero de documento");
@@ -56,7 +56,8 @@ public class RegisterUserService {
                 .findByName("PATIENT")
                 .orElseThrow(() -> new RuntimeException("Rol PATIENT no encontrado"));
 
-        // La cuenta (credenciales y rol) se crea en Keycloak; aqui solo queda el perfil.
+        // La cuenta (credenciales y rol) se crea en Keycloak; aqui solo queda el
+        // perfil.
         String keycloakUserId = keycloakAdminClient.createUser(
                 request.username(),
                 request.email(),

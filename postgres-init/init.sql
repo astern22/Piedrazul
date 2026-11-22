@@ -1,57 +1,28 @@
--- PiedrazulDB ver6
+-- PiedrazulDB ver6 init
 --
--- Unico cambio respecto a ver5: se elimina professionals.professional_type.
--- Esa columna era una desnormalizacion de specialty.name y el commit 1189469
--- ya habia quitado professionalType de todo el codigo, pero no de la base de
--- datos. Al ser NOT NULL sin valor por defecto, hacia fallar todo INSERT en
--- professionals. Ver DB/migrate_v6_quitar_professional_type.sql para migrar una
--- base de datos ver5 existente sin recrearla.
---
--- ADVERTENCIA: este script DROPea la base de datos y el esquema piedrazul.
--- Respalda los datos antes de ejecutarlo.
+-- IMPORTANTE: este script lo ejecuta la imagen de postgres SOLO la primera vez
+-- que se inicializa el volumen de datos, conectado a POSTGRES_DB (piedrazuldb)
+-- como POSTGRES_USER (postgres). Por eso aqui NO se crea la base de datos ni se
+-- toca el rol con el que se esta ejecutando el script.
 
--- Eliminar tablas
-DROP TABLE IF EXISTS piedrazul.appointments CASCADE;
-DROP TABLE IF EXISTS piedrazul.weekly_availability CASCADE;
-DROP TABLE IF EXISTS piedrazul.system_settings CASCADE;
-DROP TABLE IF EXISTS piedrazul.patients CASCADE;
-DROP TABLE IF EXISTS piedrazul.professionals CASCADE;
-DROP TABLE IF EXISTS piedrazul.specialties CASCADE;
-DROP TABLE IF EXISTS piedrazul.user_roles CASCADE;
-DROP TABLE IF EXISTS piedrazul.users CASCADE;
-DROP TABLE IF EXISTS piedrazul.roles CASCADE;
-
--- Limpiar tablas
-TRUNCATE TABLE piedrazul.appointments RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.weekly_availability RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.system_settings RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.patients RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.professionals RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.specialties RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.user_roles RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.users RESTART IDENTITY CASCADE;
-TRUNCATE TABLE piedrazul.roles RESTART IDENTITY CASCADE;
-
--- Eliminar
-DROP DATABASE IF EXISTS piedrazulDB;
+-- Eliminar schema (arrastra tablas, indices, secuencias y constraints)
 DROP SCHEMA IF EXISTS piedrazul CASCADE;
-DROP ROLE IF EXISTS piedrazul_admin;
 
--- Crear rol propietario
-CREATE ROLE piedrazul_admin LOGIN PASSWORD 'Piedrazul123.'CREATEDB;
+-- Crear rol propietario de los objetos de la aplicacion (idempotente)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'piedrazul_admin') THEN
+        CREATE ROLE piedrazul_admin WITH LOGIN PASSWORD 'Piedrazul123.';
+    END IF;
+END
+$$;
 
-GRANT USAGE ON SCHEMA piedrazul TO piedrazul_admin;
+-- Crear schema propiedad del rol de la aplicacion
+CREATE SCHEMA piedrazul AUTHORIZATION piedrazul_admin;
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA piedrazul TO piedrazul_admin;
-
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA piedrazul TO piedrazul_admin;
-
--- Crear DB
-CREATE DATABASE piedrazulDB WITH ENCODING = 'UTF8';
-
--- Crear schema
-CREATE SCHEMA IF NOT EXISTS piedrazul AUTHORIZATION piedrazul_admin;
-
+-- Crear los objetos como piedrazul_admin para que la app sea su propietaria
+-- (si se crean como postgres, la app no tendria permisos ni con ddl-auto=validate)
+SET ROLE piedrazul_admin;
 SET search_path TO piedrazul;
 
 -- Tablas
@@ -64,6 +35,7 @@ CREATE TABLE users (
     id BIGSERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    keycloak_user_id VARCHAR(255) UNIQUE,
     full_name VARCHAR(150) NOT NULL,
     email VARCHAR(120) NOT NULL UNIQUE,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -165,6 +137,8 @@ CREATE TABLE appointments (
 
     status VARCHAR(20) NOT NULL,
 
+    cancellation_reason VARCHAR(255),
+
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_appointment_patient
@@ -176,13 +150,14 @@ CREATE TABLE appointments (
         REFERENCES professionals(id)
 );
 
--- Evita doble reserva del mismo profesional
+-- Evita doble reserva del mismo profesional en citas activas
 CREATE UNIQUE INDEX uk_professional_slot
 ON appointments (
     professional_id,
     appointment_date,
     start_time
-);
+)
+WHERE status NOT IN ('CANCELLED', 'CANCELED', 'CANCELADA');
 
 -- Inserciones
 INSERT INTO specialties (name)
@@ -359,3 +334,6 @@ SELECT * FROM piedrazul.patients;
 SELECT * FROM piedrazul.system_settings;
 SELECT * FROM piedrazul.weekly_availability;
 SELECT * FROM piedrazul.appointments;
+
+-- Volver al usuario de bootstrap
+RESET ROLE;
