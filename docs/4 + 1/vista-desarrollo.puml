@@ -1,12 +1,25 @@
 @startuml
+!pragma layout elk
+skinparam linetype ortho
 title Vista de Desarrollo
+
 package "Frontend (Vue 3)" {
   [Vistas] --> [Servicios API]
+  [Servicios API] --> [keycloak.js]
 }
+
 package "Backend (Spring Boot)" {
   [Presentation] --> [Application]
   [Application] --> [Infrastructure]
   [Seguridad] ..> [Presentation] : protege
+  [Seguridad] ..> [Application] : protege
 }
-[Servicios API] ..> [Presentation] : REST/JSON
+
+package "Keycloak (OIDC)" as keycloak_pkg {
+  [Servidor Keycloak]
+}
+
+[Servicios API] ..> [Presentation] : REST/JSON + JWT
+[keycloak.js] ..> keycloak_pkg : OIDC
+[Seguridad] ..> keycloak_pkg : JWKS / Admin API
 @enduml

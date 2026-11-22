@@ -1,23 +1,36 @@
 @startuml
 title Vista de Procesos - Agendar una cita
+autonumber
+
 actor Usuario
 participant "SPA Vue" as SPA
-participant "Filtro JWT" as F
-participant AppointmentController as C
-participant AppointmentService as S
-database PostgreSQL as DB
+participant "Keycloak" as KC
+participant "API REST" as API
+participant "AppointmentService" as S
+database "PostgreSQL" as DB
+
+Usuario -> SPA : abre la aplicacion
+SPA -> KC : init check-sso / login (OIDC + PKCE)
+KC --> SPA : access token + refresh token
+
 Usuario -> SPA : agenda una cita
-SPA -> F : POST /api/appointments/create + token
-alt token inválido o rol sin permiso
-  F --> SPA : rechazo (401/403)
+SPA -> API : POST /api/appointments/create\nAuthorization: Bearer JWT
+API -> KC : valida firma e issuer (JWKS)
+
+alt token invalido o rol sin permiso
+  API --> SPA : rechazo (401/403)
 else autorizado
-  F -> C : petición
-  C -> S : createAppointment
+  API -> S : createAppointment(command)
   S -> DB : guardar cita
+
   alt horario ocupado
-    DB --> SPA : error 409
-  else
-    C --> SPA : cita creada
+    DB --> S : violacion uk_professional_slot
+    S --> API : 409 Conflict
+    API --> SPA : 409 Conflict
+  else disponible
+    DB --> S : cita creada
+    S --> API : cita creada
+    API --> SPA : 200 OK (cita)
   end
 end
 @enduml

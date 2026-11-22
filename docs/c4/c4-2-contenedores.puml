@@ -3,26 +3,41 @@
 @startuml C4_Contenedores_Piedrazul
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
+!pragma layout elk
+skinparam linetype ortho
+
 title C4 Model - Nivel 2: Diagrama de Contenedores de Piedrazul
 
-Person(paciente, "Paciente", "Consulta especialidades y profesionales, agenda y gestiona citas.")
+Person(paciente, "Paciente", "Consulta especialidades y profesionales, agenda y cancela sus citas.")
 Person(profesional, "Profesional de la Salud", "Gestiona su disponibilidad semanal y consulta sus citas.")
-Person(administrador, "Administrador", "Administra catalogos de especialidades y profesionales.")
+Person(agendador, "Agendador", "Agenda y consulta citas en nombre de los pacientes.")
+Person(administrador, "Administrador", "Administra catalogos, cuentas internas y parametros.")
 
 System_Boundary(piedrazul, "Piedrazul") {
 
-    Container(spa, "SPA Web Piedrazul", "Vue 3, Vite, Vue Router, Axios", "Aplicacion de una sola pagina en el navegador. Maneja autenticacion (JWT), vistas de especialidades, profesionales, disponibilidad y citas.")
-    Container(api, "API REST Piedrazul", "Java 21, Spring Boot, Spring MVC, Spring Security, JPA/Hibernate", "Monolito modular sobre arquitectura hexagonal. Expone los endpoints REST de los modulos de usuarios, profesionales, agendamiento y citas.")
-    ContainerDb(db, "Base de Datos Piedrazul", "PostgreSQL 15+", "Almacena usuarios, roles, especialidades, profesionales, disponibilidad semanal y citas en el esquema piedrazul.")
+    Container(spa, "SPA Web Piedrazul", "Vue 3, Vite, Vue Router, Axios, keycloak-js", "Aplicacion de una sola pagina en el navegador. Inicia sesion contra Keycloak (Authorization Code + PKCE) y consume la API con el access token JWT.")
+    Container(api, "API REST Piedrazul", "Java 21, Spring Boot 4, Spring Security OAuth2 Resource Server, JPA/Hibernate", "Monolito modular sobre arquitectura hexagonal. Valida los JWT de Keycloak y expone los endpoints REST de usuarios, pacientes, profesionales, agendamiento y citas.")
+    ContainerDb(db, "Base de Datos Piedrazul", "PostgreSQL 16", "Esquema piedrazul: perfiles de usuario, roles, pacientes, profesionales, disponibilidad semanal y citas. Las credenciales viven en Keycloak.")
+
+}
+
+System_Boundary(keycloak_sys, "Keycloak (identidad)") {
+
+    Container(keycloak, "Servidor Keycloak", "Keycloak 26.4, OpenID Connect", "Realm piedrazul. Clients: piedrazul-frontend (publico, PKCE) y piedrazul-backend (confidencial, Admin API). Roles: ADMIN, PATIENT, PROFESSIONAL, SCHEDULER.")
+    ContainerDb(keycloak_db, "Base de Datos Keycloak", "PostgreSQL 16", "Persiste usuarios, credenciales, roles y sesiones gestionadas por Keycloak.")
 
 }
 
 Rel(paciente, spa, "Navega y usa la aplicacion web", "HTTPS")
 Rel(profesional, spa, "Navega y usa la aplicacion web", "HTTPS")
+Rel(agendador, spa, "Navega y usa la aplicacion web", "HTTPS")
 Rel(administrador, spa, "Navega y usa la aplicacion web", "HTTPS")
 
-Rel(spa, api, "Llamadas REST con token JWT (JSON)", "HTTP/JSON")
+Rel(spa, keycloak, "Inicia sesion y renueva tokens (Authorization Code + PKCE)", "HTTPS/JSON")
+Rel(spa, api, "Llamadas REST con Authorization: Bearer JWT", "HTTPS/JSON")
+Rel(api, keycloak, "Valida firma e issuer (JWKS) y crea cuentas (Admin API)", "OpenID Connect / HTTPS")
 Rel(api, db, "Lectura y escritura via JDBC/JPA (Hibernate)", "JDBC")
+Rel(keycloak, keycloak_db, "Lee y escribe usuarios, roles y sesiones", "JDBC")
 
 SHOW_LEGEND()
 LAYOUT_WITH_LEGEND()

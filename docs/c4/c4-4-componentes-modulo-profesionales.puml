@@ -1,52 +1,62 @@
 ' C4 Model - Nivel 3: Diagrama de Componentes
-' Componente: Modulo de Profesionales y Especialidades (contendor API REST)
+' Componente: Modulo de Profesionales y Especialidades (contenedor API REST)
 ' Estructura interna por capas (presentation, application, domain, infrastructure)
 @startuml C4_Componentes_Modulo_Profesionales_Piedrazul
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+!pragma layout elk
+skinparam linetype ortho
 
 title C4 Model - Nivel 3: Componentes del Modulo de Profesionales y Especialidades
 
 Container_Boundary(api, "API REST Piedrazul") {
 
-    Component(profController, "ProfessionalController", "Spring MVC", "REST /api/professionals. CRUD: crear, listar, activos, por id y por especialidad.", $tags="presentation")
+    Component(profController, "ProfessionalController", "Spring MVC", "REST /api/professionals. CRUD, activos, por especialidad, registro con cuenta Keycloak y cambio de intervalo de cita.", $tags="presentation")
     Component(specController, "SpecialtyController", "Spring MVC", "REST /api/specialties. Lista y crea especialidades medicas.", $tags="presentation")
-    Component(profDto, "ProfessionalRequest / ProfessionalResponse", "Java record", "DTOs de entrada y salida del profesional.")
-    Component(specDto, "SpecialtyRequest / SpecialtyResponse", "Java record", "DTOs de entrada y salida de la especialidad.")
+    Component(dtos, "DTOs de profesionales", "Java records", "ProfessionalRequest/Response, ProfessionalRegistrationRequest, SpecialtyRequest/Response y AppointmentIntervalRequest.", $tags="presentation")
 
-    Component(profSvc, "ProfessionalService", "Spring @Service", "Reglas de negocio del profesional: valida unicidad por usuario, crea profesional activo y consulta por especialidad.")
-    Component(specSvc, "SpecialtyService", "Spring @Service", "Reglas de negocio de especialidad: evita duplicados por nombre (case-insensitive).")
+    Component(profSvc, "ProfessionalService", "Spring @Service", "Reglas del profesional: unicidad por usuario, crea la cuenta PROFESSIONAL en Keycloak, guarda el perfil y valida el intervalo de cita.", $tags="application")
+    Component(specSvc, "SpecialtyService", "Spring @Service", "Reglas de especialidad: evita duplicados por nombre (case-insensitive).", $tags="application")
 
-    Component(prof, "Professional", "Clase de dominio", "Entidad de dominio del profesional (userId, specialtyId, appointmentIntervalMinutes, active).")
-    Component(spec, "Specialty", "Clase de dominio", "Entidad de dominio de la especialidad (id, name).")
+    Component(domain, "Professional / Specialty", "Clases de dominio", "Professional: userId, specialtyId, appointmentIntervalMinutes, active. Specialty: id, name.", $tags="domain")
 
-    Component(profEntity, "ProfessionalEntity", "JPA @Entity", "Tabla professionals.")
-    Component(specEntity, "SpecialtyEntity", "JPA @Entity", "Tabla specialties.")
-    Component(profRepo, "ProfessionalRepository", "Spring Data JPA", "Acceso a professionals: findByActiveTrue, findBySpecialtyId, existsByUserId.")
-    Component(specRepo, "SpecialtyRepository", "Spring Data JPA", "Acceso a specialties: existsByNameIgnoreCase.")
+    Component(profEntity, "ProfessionalEntity", "JPA @Entity", "Tabla professionals.", $tags="infrastructure")
+    Component(specEntity, "SpecialtyEntity", "JPA @Entity", "Tabla specialties.", $tags="infrastructure")
+    Component(profRepo, "ProfessionalRepository", "Spring Data JPA", "findByActiveTrue, findBySpecialtyId, existsByUserId.", $tags="infrastructure")
+    Component(specRepo, "SpecialtyRepository", "Spring Data JPA", "existsByNameIgnoreCase.", $tags="infrastructure")
 
 }
 
-Component(mod_users, "Modulo de Autenticacion y Usuarios", "Spring Beans", "Provee el id de usuario registrado (userId) del profesional.")
-Component(db, "Base de Datos Piedrazul", "PostgreSQL", "Esquema piedrazul, tablas specialties y professionals.")
+Component(keycloakAdmin, "KeycloakAdminClient", "Modulo Seguridad", "Crea la cuenta PROFESSIONAL y asigna el rol de realm.")
+Component(userRepo, "UserRepository", "Modulo Usuarios", "Verifica username/email y guarda el perfil del profesional.")
+Component(roleRepo, "RoleRepository", "Modulo Usuarios", "Obtiene el rol PROFESSIONAL.")
+System_Ext(keycloak, "Keycloak", "Realm piedrazul: usuarios y roles.")
+ContainerDb(db, "Base de Datos Piedrazul", "PostgreSQL 16", "Esquema piedrazul: specialties y professionals.")
 
-Rel(profController, profDto, "Recibe y construye los DTO del profesional")
+Rel(profController, dtos, "Recibe y construye los DTO del profesional")
 Rel(profController, profSvc, "Delega las operaciones de negocio")
-Rel(specController, specDto, "Recibe y construye los DTO de especialidad")
+Rel(specController, dtos, "Recibe y construye los DTO de especialidad")
 Rel(specController, specSvc, "Delega las operaciones de negocio")
 
 Rel(profSvc, profEntity, "Construye y persiste el profesional")
-Rel(profSvc, profRepo, "Valida unicidad por usuario y consulta")
+Rel(profSvc, profRepo, "Valida unicidad y consulta")
+Rel(profSvc, specRepo, "Valida la especialidad")
+Rel(profSvc, keycloakAdmin, "Crea la cuenta PROFESSIONAL y asigna el rol", "Spring Beans")
+Rel(profSvc, userRepo, "Guarda el perfil de usuario", "Spring Beans")
+Rel(profSvc, roleRepo, "Busca el rol PROFESSIONAL", "Spring Beans")
+
 Rel(specSvc, specEntity, "Construye y persiste la especialidad")
 Rel(specSvc, specRepo, "Valida duplicados por nombre")
 
+Rel(keycloakAdmin, keycloak, "Crea usuarios y asigna roles", "Admin API / HTTPS")
+
 Rel(profEntity, profRepo, "Mapeado por JPA")
 Rel(specEntity, specRepo, "Mapeado por JPA")
-Rel(profRepo, db, "SELECT/INSERT via JDBC", "JDBC")
+Rel(profRepo, db, "SELECT/INSERT/UPDATE via JDBC", "JDBC")
 Rel(specRepo, db, "SELECT/INSERT via JDBC", "JDBC")
 
-Rel_Back(prof, profEntity, "Modela el agregado de dominio")
-Rel_Back(spec, specEntity, "Modela el agregado de dominio")
-Rel(profSvc, mod_users, "Enlaza el userId de un usuario existente", "Spring Beans")
+Rel_Back(domain, profEntity, "Modela el agregado de dominio")
+Rel_Back(domain, specEntity, "Modela el agregado de dominio")
 
 SHOW_LEGEND()
 LAYOUT_WITH_LEGEND()

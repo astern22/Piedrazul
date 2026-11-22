@@ -1,54 +1,63 @@
 ' C4 Model - Nivel 3: Diagrama de Componentes
-' Componente: Modulo de Autenticacion y Usuarios (contendor API REST)
+' Componente: Modulo de Autenticacion y Usuarios (contenedor API REST)
 ' Estructura interna por capas (presentation, application, domain, infrastructure)
 @startuml C4_Componentes_Modulo_Usuarios_Piedrazul
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+!pragma layout elk
+skinparam linetype ortho
 
 title C4 Model - Nivel 3: Componentes del Modulo de Autenticacion y Usuarios
 
 Container_Boundary(api, "API REST Piedrazul") {
 
-    Component(controller, "AuthController", "Spring MVC", "REST /auth. POST /auth/register (alta de pacientes con rol PATIENT) y POST /auth/login (emision de token JWT).", $tags="presentation")
-    Component(dtoReq, "LoginRequest / RegisterRequest", "Java record", "DTOs de entrada validados por Jakarta Bean Validation.")
-    Component(dtoRes, "LoginResponse / RegisterResponse", "Java record", "DTOs de salida: token JWT y username registrado.")
+    Component(controller, "AuthController", "Spring MVC", "POST /auth/register. Registro publico de pacientes; el login lo gestiona Keycloak.", $tags="presentation")
+    Component(adminController, "UserAdminController", "Spring MVC", "POST/GET /api/users/schedulers. Solo el rol ADMIN puede crear y listar agendadores.", $tags="presentation")
+    Component(dtos, "DTOs de usuarios", "Java records", "RegisterRequest, RegisterResponse, SchedulerRegistrationRequest y UserSummaryResponse.", $tags="presentation")
 
-    Component(registerSvc, "RegisterUserService", "Spring @Service", "Crea el usuario, cifra la contrasena con BCrypt y le asigna el rol PATIENT.")
-    Component(loginSvc, "LoginService", "Spring @Service", "Valida credenciales contra el repositorio y genera el token JWT.")
+    Component(registerSvc, "RegisterUserService", "Spring @Service", "Crea la cuenta en Keycloak, guarda el perfil local y crea o vincula el paciente.", $tags="application")
+    Component(schedulerSvc, "SchedulerUserService", "Spring @Service", "Crea la cuenta SCHEDULER en Keycloak y guarda el perfil local.", $tags="application")
 
-    Component(user, "User", "Clase de dominio", "Entidad de dominio del usuario (id, username, password, fullName, email, enabled).")
-    Component(role, "Role", "Clase de dominio", "Entidad de dominio del rol (id, name).")
+    Component(domain, "User / Role", "Clases de dominio", "User: id, username, password={keycloak}, keycloakUserId, fullName, email, enabled. Role: id, name.", $tags="domain")
 
-    Component(userEntity, "UserEntity", "JPA @Entity", "Tabla users. Relacion ManyToMany con RoleEntity via user_roles.")
-    Component(roleEntity, "RoleEntity", "JPA @Entity", "Tabla roles.")
-    Component(userRepo, "UserRepository", "Spring Data JPA", "Acceso a users. findByUsername para login y autenticacion JWT.")
-    Component(roleRepo, "RoleRepository", "Spring Data JPA", "Acceso a roles. findByName(PATIENT) para el registro.")
+    Component(userEntity, "UserEntity", "JPA @Entity", "Tabla users. keycloak_user_id unico y relacion ManyToMany con RoleEntity via user_roles.", $tags="infrastructure")
+    Component(roleEntity, "RoleEntity", "JPA @Entity", "Tabla roles.", $tags="infrastructure")
+    Component(userRepo, "UserRepository", "Spring Data JPA", "findByUsername, findByKeycloakUserId, existsByUsername, existsByEmail y findByRoles_NameOrderByFullNameAsc.", $tags="infrastructure")
+    Component(roleRepo, "RoleRepository", "Spring Data JPA", "findByName para PATIENT y SCHEDULER.", $tags="infrastructure")
 
 }
 
-Component(jwt, "JwtService", "Spring @Service", "Emite y valida tokens JWT (solo cliente de la libreria, pertenece al modulo de seguridad).")
-Component(passEncoder, "PasswordEncoder (BCrypt)", "Spring Security", "Cifrado y comparacion de contrasenas.")
-Component(db, "Base de Datos Piedrazul", "PostgreSQL", "Esquema piedrazul, tablas users, roles y user_roles.")
+Component(keycloakAdmin, "KeycloakAdminClient", "Modulo Seguridad", "Crea y elimina usuarios, y asigna roles de realm mediante la Admin API.")
+Component(patientRepo, "PatientRepository", "Modulo Pacientes", "Vincula el perfil de paciente con el usuario registrado.")
+System_Ext(keycloak, "Keycloak", "Realm piedrazul: usuarios, credenciales y roles.")
+ContainerDb(db, "Base de Datos Piedrazul", "PostgreSQL 16", "Esquema piedrazul: users, roles y user_roles.")
 
-Rel(controller, dtoReq, "Recibe y valida datos de entrada")
-Rel(controller, dtoRes, "Construye la respuesta")
-Rel(controller, registerSvc, "Delega el alta de usuario")
-Rel(controller, loginSvc, "Delega la autenticacion")
+Rel(controller, dtos, "Recibe y construye los DTO de registro")
+Rel(controller, registerSvc, "Delega el alta del paciente")
 
-Rel(registerSvc, userEntity, "Construye y persiste el usuario")
-Rel(registerSvc, roleRepo, "Busca el rol PATIENT")
-Rel(registerSvc, passEncoder, "Cifra la contrasena")
+Rel(adminController, dtos, "Recibe y construye los DTO de agendador")
+Rel(adminController, schedulerSvc, "Delega el alta del agendador")
 
-Rel(loginSvc, userRepo, "Busca el usuario por username")
-Rel(loginSvc, passEncoder, "Compara la contrasena")
-Rel(loginSvc, jwt, "Genera el token JWT")
+Rel(registerSvc, keycloakAdmin, "Crea la cuenta PATIENT y asigna el rol", "Spring Beans")
+Rel(registerSvc, userRepo, "Guarda el perfil local", "Spring Beans")
+Rel(registerSvc, roleRepo, "Busca el rol PATIENT", "Spring Beans")
+Rel(registerSvc, patientRepo, "Crea o vincula el paciente", "Spring Beans")
+
+Rel(schedulerSvc, keycloakAdmin, "Crea la cuenta SCHEDULER y asigna el rol", "Spring Beans")
+Rel(schedulerSvc, userRepo, "Guarda el perfil local", "Spring Beans")
+Rel(schedulerSvc, roleRepo, "Busca el rol SCHEDULER", "Spring Beans")
+
+Rel(keycloakAdmin, keycloak, "Crea/elimina usuarios y asigna roles", "Admin API / HTTPS")
 
 Rel(userEntity, userRepo, "Mapeado por JPA")
 Rel(roleEntity, roleRepo, "Mapeado por JPA")
+Rel(userEntity, roleEntity, "N:M via user_roles")
 Rel(userRepo, db, "SELECT/INSERT/UPDATE via JDBC", "JDBC")
 Rel(roleRepo, db, "SELECT/INSERT via JDBC", "JDBC")
+Rel(patientRepo, db, "Actualiza patients.user_id", "JDBC")
 
-Rel_Back(user, userEntity, "Modela el agregado de dominio")
-Rel_Back(role, roleEntity, "Modela el agregado de dominio")
+Rel_Back(domain, userEntity, "Modela el agregado de dominio")
+Rel_Back(domain, roleEntity, "Modela el agregado de dominio")
 
 SHOW_LEGEND()
 LAYOUT_WITH_LEGEND()

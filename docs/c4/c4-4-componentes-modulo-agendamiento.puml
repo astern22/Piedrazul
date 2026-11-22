@@ -4,45 +4,47 @@
 @startuml C4_Componentes_Modulo_Agendamiento_Piedrazul
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
+!pragma layout elk
+skinparam linetype ortho
+
 title C4 Model - Nivel 3: Componentes del Modulo de Agendamiento y Disponibilidad
 
 Container_Boundary(api, "API REST Piedrazul") {
 
     Component(slotController, "AvailableSlotController", "Spring MVC", "REST /api/availability/professional/{professionalId}/slots. Calcula las franjas horarias libres de un profesional para una fecha.", $tags="presentation")
-    Component(weeklyController, "WeeklyAvailabilityController", "Spring MVC", "REST /api/availability. Crear, consultar por profesional/dia y desactivar disponibilidad semanal.", $tags="presentation")
-    Component(slotDto, "AvailableSlotResponse", "Java record", "DTO de salida con startTime y endTime de la franja libre.")
-    Component(weekDto, "WeeklyAvailabilityRequest / WeeklyAvailabilityResponse", "Java record", "DTOs de entrada y salida de la disponibilidad semanal.")
+    Component(weeklyController, "WeeklyAvailabilityController", "Spring MVC", "REST /api/availability. Crea, consulta por profesional/dia y desactiva la disponibilidad semanal.", $tags="presentation")
+    Component(dtos, "DTOs de disponibilidad", "Java records", "AvailableSlotResponse, WeeklyAvailabilityRequest y WeeklyAvailabilityResponse.", $tags="presentation")
 
-    Component(slotSvc, "AvailableSlotService", "Spring @Service", "Combina la disponibilidad semanal activa, el intervalo del profesional y las citas ya reservadas para devolver las franjas libres.")
-    Component(weekSvc, "WeeklyAvailabilityService", "Spring @Service", "Reglas de negocio de disponibilidad: valida rango horario, crea franjas activas y permite desactivarlas.")
+    Component(slotSvc, "AvailableSlotService", "Spring @Service", "Combina la disponibilidad semanal activa, el intervalo del profesional y las citas ya reservadas para devolver las franjas libres.", $tags="application")
+    Component(weekSvc, "WeeklyAvailabilityService", "Spring @Service", "Reglas de negocio de disponibilidad: valida el rango horario, evita solapamientos, crea franjas activas y permite desactivarlas.", $tags="application")
 
-    Component(weeklyAv, "WeeklyAvailability", "Clase de dominio", "Entidad de dominio de la disponibilidad semanal (professionalId, dayOfWeek, startTime, endTime, active).")
+    Component(domain, "WeeklyAvailability", "Clase de dominio", "Entidad de dominio de la disponibilidad semanal (professionalId, dayOfWeek, startTime, endTime, active).", $tags="domain")
 
-    Component(weekEntity, "WeeklyAvailabilityEntity", "JPA @Entity", "Tabla weekly_availability.")
-    Component(weekRepo, "WeeklyAvailabilityRepository", "Spring Data JPA", "Acceso a weekly_availability: findByProfessionalIdAndDayOfWeek, findByProfessionalIdAndActiveTrue.")
+    Component(weekEntity, "WeeklyAvailabilityEntity", "JPA @Entity", "Tabla weekly_availability.", $tags="infrastructure")
+    Component(weekRepo, "WeeklyAvailabilityRepository", "Spring Data JPA", "findByProfessionalIdAndDayOfWeek, findByProfessionalIdAndActiveTrue y findByProfessionalIdAndDayOfWeekAndActiveTrue.", $tags="infrastructure")
 
 }
 
 Component(profRepo, "ProfessionalRepository", "Modulo Profesionales", "Obtiene el profesional (active y appointmentIntervalMinutes).")
-Component(apptSvc, "AppointmentService", "Modulo Citas", "Devuelve las citas de un profesional en una fecha (findAppointments).")
-Component(db, "Base de Datos Piedrazul", "PostgreSQL", "Esquema piedrazul, tabla weekly_availability.")
+Component(apptSvc, "AppointmentService", "Modulo Citas", "Devuelve las citas de un profesional en una fecha.")
+ContainerDb(db, "Base de Datos Piedrazul", "PostgreSQL 16", "Esquema piedrazul: tabla weekly_availability.")
 
-Rel(slotController, slotDto, "Construye el DTO de franja libre")
+Rel(slotController, dtos, "Construye el DTO de franja libre")
 Rel(slotController, slotSvc, "Delega el calculo de franjas")
-Rel(weeklyController, weekDto, "Recibe y construye los DTO de disponibilidad")
+Rel(weeklyController, dtos, "Recibe y construye los DTO de disponibilidad")
 Rel(weeklyController, weekSvc, "Delega las operaciones de disponibilidad")
 
-Rel(slotSvc, profRepo, "Valida el profesional activo y su intervalo", "Spring Beans / SQL")
-Rel(slotSvc, weekRepo, "Obtiene las disponibilidades activas del dia", "Spring Beans / SQL")
-Rel(slotSvc, apptSvc, "Obtiene las citas existentes de la fecha", "Spring Beans / SQL")
+Rel(slotSvc, profRepo, "Valida el profesional activo y su intervalo", "Spring Beans")
+Rel(slotSvc, weekRepo, "Obtiene las disponibilidades activas del dia", "Spring Beans")
+Rel(slotSvc, apptSvc, "Obtiene las citas existentes de la fecha", "Spring Beans")
 
 Rel(weekSvc, weekEntity, "Construye y persiste la disponibilidad")
-Rel(weekSvc, weekRepo, "Consulta y desactiva disponibilidad")
+Rel(weekSvc, weekRepo, "Consulta, valida y desactiva disponibilidad")
 
 Rel(weekEntity, weekRepo, "Mapeado por JPA")
 Rel(weekRepo, db, "SELECT/INSERT/UPDATE via JDBC", "JDBC")
 
-Rel_Back(weeklyAv, weekEntity, "Modela el agregado de dominio")
+Rel_Back(domain, weekEntity, "Modela el agregado de dominio")
 
 SHOW_LEGEND()
 LAYOUT_WITH_LEGEND()

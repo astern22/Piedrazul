@@ -1,34 +1,44 @@
 ' C4 Model - Nivel 3: Diagrama de Componentes
-' Componente: Seguridad Transversal (JWT) del contenedor API REST
+' Componente: Seguridad Transversal (OAuth2 + Keycloak) del contenedor API REST
 ' Infraestructura transversal compartida por todos los modulos
 @startuml C4_Componentes_Seguridad_Piedrazul
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 
-title C4 Model - Nivel 3: Componentes de Seguridad Transversal (JWT)
+!pragma layout elk
+skinparam linetype ortho
+
+title C4 Model - Nivel 3: Componentes de Seguridad Transversal (OAuth2 + Keycloak)
 
 Container_Boundary(api, "API REST Piedrazul") {
 
-    Component(jwtFilter, "JwtAuthenticationFilter", "Spring MVC (OncePerRequestFilter)", "Extrae el header Authorization (Bearer), valida el token, carga el usuario y sus roles y establece la autenticacion en el SecurityContext.", $tags="infrastructure")
-    Component(jwtSvc, "JwtService", "Spring @Service", "Genera, parsea y valida tokens JWT HS256. Firmado con clave HMAC y expiracion de 24 horas.")
-    Component(secConfig, "SecurityConfig", "Spring @Configuration", "Cadena de filtros: CSRF desactivado, sesiones STATELESS, /auth/** publico y cualquier otra ruta autenticada.")
-    Component(beansConfig, "SecurityBeansConfig", "Spring @Configuration", "Define el bean PasswordEncoder BCrypt.")
+    Component(secConfig, "SecurityConfig", "Spring @Configuration", "Resource Server OAuth2: CSRF desactivado, sesiones STATELESS, reglas por rol y JwtDecoder con issuer/JWKS.", $tags="infrastructure")
+    Component(converter, "KeycloakJwtAuthenticationConverter", "Spring Security", "Convierte el JWT en Authentication y extrae los roles de realm_access.roles como ROLE_*.", $tags="infrastructure")
+    Component(authUser, "AuthenticatedUserService", "Spring @Service", "Expone el sub (keycloakUserId) y preferred_username del usuario autenticado.", $tags="infrastructure")
+    Component(keycloakAdmin, "KeycloakAdminClient", "Spring @Component", "Se autentica con client_credentials y crea/elimina usuarios y asigna roles de realm mediante la Admin API.", $tags="infrastructure")
 
 }
 
-Component(controllerGuard, "Controllers /auth/**", "Modulo Usuarios", "Rutas publicas: registro y login.")
-Component(protectedEndpoints, "Endpoints /api/**", "Modulos Profesionales, Agendamiento, Citas", "Rutas protegidas que requieren token JWT valido.")
-Component(userRepo, "UserRepository", "Modulo Usuarios", "Carga el usuario por username para comprobar habilitacion y roles.")
-Component(loginSvc, "LoginService", "Modulo Usuarios", "Emite el token JWT tras validar credenciales.")
+System_Ext(keycloak, "Keycloak", "Realm piedrazul: emision de tokens, JWKS y Admin API.")
+Component(publicEndpoints, "Endpoints /auth/**", "Modulo Usuarios", "Registro publico de pacientes. El login lo gestiona Keycloak.")
+Component(protectedEndpoints, "Endpoints /api/**", "Modulos Pacientes, Profesionales, Agendamiento y Citas", "Rutas protegidas que requieren un JWT valido y el rol adecuado.")
+Component(userRepo, "UserRepository", "Modulo Usuarios", "Perfil local vinculado por keycloak_user_id o username.")
 
-Rel(secConfig, jwtFilter, "Registra el filtro antes de UsernamePasswordAuthenticationFilter", "Seguridad web")
-Rel(secConfig, controllerGuard, "Permite el acceso publico a /auth/**", "URL pattern")
-Rel(secConfig, protectedEndpoints, "Exige autenticacion al resto de rutas", "URL pattern")
+Rel(secConfig, keycloak, "Descarga JWKS y valida firma, issuer y vigencia", "OpenID Connect / HTTPS")
+Rel(secConfig, converter, "Configura la conversion de JWT a Authentication")
+Rel(secConfig, publicEndpoints, "Permite el acceso publico a /auth/**", "URL pattern")
+Rel(secConfig, protectedEndpoints, "Exige autenticacion y autoriza por rol", "URL pattern")
 
-Rel(jwtFilter, jwtSvc, "Extrae y valida el username del token")
-Rel(jwtFilter, userRepo, "Carga el usuario y sus roles (ROLE_*)")
+Rel(converter, protectedEndpoints, "Publica ROLE_* a partir de realm_access.roles")
+Rel(protectedEndpoints, authUser, "Consulta el sub y preferred_username de la sesion")
+Rel(authUser, userRepo, "Resuelve el perfil local del usuario", "Spring Beans")
 
-Rel(loginSvc, jwtSvc, "Genera el token tras autenticar")
-Rel(jwtSvc, beansConfig, "Reutiliza el bean PasswordEncoder", "Spring Beans")
+Rel(keycloakAdmin, keycloak, "Crea/elimina usuarios y asigna roles", "Admin API / HTTPS")
+
+note bottom of api
+  Los componentes JWT locales anteriores (JwtService,
+  JwtAuthenticationFilter y LoginService) ya no participan en
+  el flujo: Keycloak emite y valida los tokens.
+end note
 
 SHOW_LEGEND()
 LAYOUT_WITH_LEGEND()
