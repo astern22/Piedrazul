@@ -1,4 +1,4 @@
-# Piedrazul
+# Piedra Azul
 
 ![Java](https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring](https://img.shields.io/badge/spring-%236DB33F.svg?style=for-the-badge&logo=spring&logoColor=white)
@@ -47,6 +47,25 @@ Para remover por completo el proyecto:
 ```bash
 docker compose down --rmi all
 ```
+
+### Usuarios de prueba keycloak
+
+| Usuario      | Contraseña  | Rol                                       |
+| ------------ | ----------- | ----------------------------------------- |
+| `admin`      | `Admin123!` | ADMIN                                     |
+| `medico1`    | `1234`      | PROFESSIONAL                              |
+| `paciente1`  | `1234`      | PATIENT                                   |
+| `terapeuta1` | `1234`      | PROFESSIONAL (deshabilitado para pruebas) |
+
+## Puertos
+
+- La API del backend se ejecuta en `http://localhost:8080/api`.
+
+- La aplicacion web se ejecuta en `http://localhost:3000`.
+
+- La base de datos de postgres se ejecuta en `http://localhost:5432`.
+
+- Consola de Keycloak: `http://localhost:8081`
 
 ## Documentación
 
