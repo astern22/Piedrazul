@@ -45,6 +45,8 @@ class AppointmentServiceTest {
 
     @Mock
     private PatientRepository patientRepository;
+
+    @Mock
     private PatientService patientService;
 
     @Mock

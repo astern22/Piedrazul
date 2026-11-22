@@ -141,21 +141,37 @@ public class PatientService {
     }
 
     public PatientEntity getMyPatient() {
+        String username = null;
+        try {
+            username = authenticatedUserService.getUsername();
+        } catch (Exception ignored) {
+        }
 
-        String keycloakUserId =
-                authenticatedUserService.getKeycloakUserId();
+        String keycloakUserId = null;
+        try {
+            keycloakUserId = authenticatedUserService.getKeycloakUserId();
+        } catch (Exception ignored) {
+        }
 
-        UserEntity user = userRepository
-                .findByKeycloakUserId(keycloakUserId)
-                .orElseThrow(() ->
-                        new RuntimeException("Usuario no encontrado"));
+        UserEntity user = null;
+        if (keycloakUserId != null && !keycloakUserId.isBlank()) {
+            user = userRepository.findByKeycloakUserId(keycloakUserId).orElse(null);
+        }
 
-        PatientEntity patient = patientRepository
-                .findByUserId(user.getId())
-                .orElseThrow(() ->
-                        new RuntimeException("Paciente no encontrado"));
+        if (user == null && username != null && !username.isBlank()) {
+            user = userRepository.findByUsername(username).orElse(null);
+            if (user != null && keycloakUserId != null && !keycloakUserId.isBlank() && user.getKeycloakUserId() == null) {
+                user.setKeycloakUserId(keycloakUserId);
+                userRepository.save(user);
+            }
+        }
 
-        return patient;
+        if (user == null) {
+            throw new RuntimeException("Usuario no encontrado");
+        }
+
+        return patientRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("No se encontro un paciente vinculado a tu usuario"));
     }
 }
 

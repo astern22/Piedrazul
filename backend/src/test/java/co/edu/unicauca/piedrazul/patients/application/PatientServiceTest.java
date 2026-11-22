@@ -4,6 +4,7 @@ import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEnti
 import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientRepository;
 import co.edu.unicauca.piedrazul.patients.presentation.dto.PatientRequest;
 import co.edu.unicauca.piedrazul.patients.presentation.dto.PatientResponse;
+import co.edu.unicauca.piedrazul.security.AuthenticatedUserService;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,9 @@ class PatientServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private AuthenticatedUserService authenticatedUserService;
 
     @InjectMocks
     private PatientService patientService;
@@ -291,5 +295,57 @@ class PatientServiceTest {
 
         assertThrows(RuntimeException.class, () -> patientService.delete(99L));
         verify(patientRepository, never()).delete(any());
+    }
+
+    @Test
+    void testGetMyPatient_FoundByUsername_SyncsKeycloakId() {
+        when(authenticatedUserService.getUsername()).thenReturn("juanperez");
+        when(authenticatedUserService.getKeycloakUserId()).thenReturn("kc-123");
+        when(userRepository.findByKeycloakUserId("kc-123")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("juanperez")).thenReturn(Optional.of(sampleUser));
+        when(patientRepository.findByUserId(2L)).thenReturn(Optional.of(samplePatient));
+
+        PatientEntity result = patientService.getMyPatient();
+
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        assertEquals("kc-123", sampleUser.getKeycloakUserId());
+        verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    void testGetMyPatient_FoundByKeycloakId() {
+        sampleUser.setKeycloakUserId("kc-123");
+        when(authenticatedUserService.getUsername()).thenReturn("juanperez");
+        when(authenticatedUserService.getKeycloakUserId()).thenReturn("kc-123");
+        when(userRepository.findByKeycloakUserId("kc-123")).thenReturn(Optional.of(sampleUser));
+        when(patientRepository.findByUserId(2L)).thenReturn(Optional.of(samplePatient));
+
+        PatientEntity result = patientService.getMyPatient();
+
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testGetMyPatient_UserNotFound() {
+        when(authenticatedUserService.getUsername()).thenReturn("unknown");
+        when(authenticatedUserService.getKeycloakUserId()).thenReturn(null);
+        when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> patientService.getMyPatient());
+        assertTrue(ex.getMessage().contains("Usuario no encontrado"));
+    }
+
+    @Test
+    void testGetMyPatient_PatientNotLinked() {
+        when(authenticatedUserService.getUsername()).thenReturn("juanperez");
+        when(authenticatedUserService.getKeycloakUserId()).thenReturn(null);
+        when(userRepository.findByUsername("juanperez")).thenReturn(Optional.of(sampleUser));
+        when(patientRepository.findByUserId(2L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> patientService.getMyPatient());
+        assertTrue(ex.getMessage().contains("No se encontro un paciente vinculado"));
     }
 }

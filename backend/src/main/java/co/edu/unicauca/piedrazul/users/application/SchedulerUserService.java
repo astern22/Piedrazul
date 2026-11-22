@@ -68,6 +68,7 @@ public class SchedulerUserService {
             user.setFullName(fullName);
             user.setEmail(email);
             user.setPassword(KeycloakAdminClient.LOCAL_PASSWORD_PLACEHOLDER);
+            user.setKeycloakUserId(keycloakUserId);
             user.setEnabled(true);
             user.getRoles().add(schedulerRole);
 
