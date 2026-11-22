@@ -1,0 +1,198 @@
+package co.edu.unicauca.piedrazul.appointments.presentation;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+
+import co.edu.unicauca.piedrazul.appointments.application.AppointmentService;
+import co.edu.unicauca.piedrazul.appointments.infrastructure.persistence.AppointmentEntity;
+import co.edu.unicauca.piedrazul.appointments.presentation.command.CreateAppointmentCommand;
+import co.edu.unicauca.piedrazul.appointments.presentation.dto.AppointmentRequest;
+import co.edu.unicauca.piedrazul.appointments.presentation.dto.AppointmentResponse;
+import co.edu.unicauca.piedrazul.appointments.presentation.dto.CancelAppointmentRequest;
+import co.edu.unicauca.piedrazul.appointments.presentation.dto.PatientAppointmentHistoryResponse;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/api/appointments")
+public class AppointmentController {
+
+    private final AppointmentService service;
+
+    public AppointmentController(AppointmentService service) {
+        this.service = service;
+    }
+
+    @PostMapping("/create")
+    public ResponseEntity<?> createAppointment(@Valid @RequestBody AppointmentRequest request,
+            Authentication authentication) {
+        try {
+            // Un paciente solo puede agendar para si mismo: se ignora el patientId del
+            // cuerpo
+            Long patientId = isPatient(authentication)
+                    ? service.getPatientIdByUsername((String) authentication.getPrincipal())
+                    : request.patientId();
+
+            CreateAppointmentCommand command = new CreateAppointmentCommand(
+                    patientId, request.professionalId(), request.appointmentDate(),
+                    request.startTime(), request.endTime());
+
+            AppointmentEntity createdAppointment = service.createAppointment(command);
+
+            AppointmentResponse response = new AppointmentResponse(
+                    createdAppointment.getId(), createdAppointment.getPatientId(),
+                    createdAppointment.getProfessionalId(), createdAppointment.getAppointmentDate(),
+                    createdAppointment.getStartTime(), createdAppointment.getEndTime(),
+                    createdAppointment.getStatus());
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<AppointmentEntity> updateAppointment(@PathVariable Long id,
+            @Valid @RequestBody AppointmentEntity appointment) {
+        AppointmentEntity existingAppointment = service.getAppointmentById(id);
+        if (existingAppointment != null) {
+            existingAppointment.setProfessionalId(appointment.getProfessionalId());
+            existingAppointment.setPatientId(appointment.getPatientId());
+            existingAppointment.setAppointmentDate(appointment.getAppointmentDate());
+            existingAppointment.setStartTime(appointment.getStartTime());
+            existingAppointment.setEndTime(appointment.getEndTime());
+            existingAppointment.setStatus(appointment.getStatus());
+            if (appointment.getCreatedAt() != null) {
+                existingAppointment.setCreatedAt(appointment.getCreatedAt());
+            }
+
+            AppointmentEntity updatedAppointment = service.updateAppointment(existingAppointment);
+            return ResponseEntity.ok(updatedAppointment);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AppointmentEntity> getAppointmentById(@PathVariable Long id) {
+        AppointmentEntity appointment = service.getAppointmentById(id);
+        if (appointment != null) {
+            return ResponseEntity.ok(appointment);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/professional/{professionalId}")
+    public ResponseEntity<List<AppointmentEntity>> getAppointmentsByProfessionalId(
+            @PathVariable("professionalId") Long professionalId) {
+        return ResponseEntity.ok(service.getAppointmentsByProfessionalId(professionalId));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<AppointmentEntity>> getAllAppointments() {
+        List<AppointmentEntity> appointments = service.getAllAppointments();
+        return ResponseEntity.ok(appointments);
+    }
+
+    /** Citas del paciente autenticado (solo rol PATIENT, ver SecurityConfig). */
+    @GetMapping("/me")
+    public ResponseEntity<List<AppointmentEntity>> getMyAppointments(
+            Authentication authentication,
+            @RequestParam(required = false) Long professionalId,
+            @RequestParam(required = false) LocalDate date) {
+        return ResponseEntity.ok(service.getAppointmentsByUsername(
+                (String) authentication.getPrincipal(), professionalId, date));
+    }
+
+    @GetMapping("/patient/{patientId}")
+    public ResponseEntity<List<AppointmentEntity>> getAppointmentsByPatientId(@PathVariable Long patientId) {
+        return ResponseEntity.ok(service.getAppointmentsByPatientId(patientId));
+    }
+
+    @GetMapping("/patient/document/{documentNumber}/history")
+    public ResponseEntity<PatientAppointmentHistoryResponse> getAppointmentHistoryByDocument(
+            @PathVariable String documentNumber) {
+        return ResponseEntity.ok(service.getAppointmentHistoryByDocument(documentNumber));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteAppointment(@PathVariable Long id) {
+        AppointmentEntity existingAppointment = service.getAppointmentById(id);
+        if (existingAppointment != null) {
+            service.deleteAppointment(id);
+            return ResponseEntity.noContent().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/search")
+    public List<AppointmentEntity> search(
+            @RequestParam(required = false) Long professionalId,
+            @RequestParam(required = false) LocalDate date) {
+
+        return service.findAppointments(
+                professionalId,
+                date);
+    }
+
+    private boolean isPatient(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_PATIENT".equals(a.getAuthority()));
+    }
+
+    @RequestMapping(value = "/me/cancel/{id}", method = {RequestMethod.DELETE, RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<?> cancelAppointmentById(
+            @PathVariable Long id,
+            @RequestBody(required = false) CancelAppointmentRequest body,
+            @RequestParam(value = "reason", required = false) String reasonParam,
+            @RequestParam(value = "motivo", required = false) String motivoParam,
+            Authentication auth) {
+
+        String reason = null;
+        if (body != null && body.getReason() != null && !body.getReason().trim().isEmpty()) {
+            reason = body.getReason().trim();
+        } else if (reasonParam != null && !reasonParam.trim().isEmpty()) {
+            reason = reasonParam.trim();
+        } else if (motivoParam != null && !motivoParam.trim().isEmpty()) {
+            reason = motivoParam.trim();
+        }
+
+        if (reason == null || reason.trim().isEmpty()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "El motivo de la cancelación es obligatorio."));
+        }
+
+        AppointmentEntity existingAppointment = service.getAppointmentById(id);
+
+        if (existingAppointment == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String username = auth.getName();
+        Long patId = service.getPatientIdByUsername(username);
+
+        if (patId == null ||
+                !existingAppointment.getPatientId().equals(patId)) {
+            return ResponseEntity.status(403)
+                    .body(Map.of("message", "No tienes permiso para cancelar esta cita."));
+        }
+
+        try {
+            AppointmentEntity app = service.cancelAppointment(existingAppointment, reason);
+
+            return ResponseEntity.ok(app);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", e.getMessage()));
+        }
+    }
+}

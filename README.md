@@ -1,12 +1,50 @@
-# Documentación de Piedrazul
+# Piedrazul
 
-Esta rama reúne la documentación de requisitos y arquitectura del sistema Piedrazul. El README general del proyecto se encuentra en la rama `master`.
+![Java](https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring](https://img.shields.io/badge/spring-%236DB33F.svg?style=for-the-badge&logo=spring&logoColor=white)
+![Vue.js](https://img.shields.io/badge/vue.js-%2335495e.svg?style=for-the-badge&logo=vuedotjs&logoColor=%234FC08D)
 
-## Documentos
+Sistema web para gestionar pacientes, profesionales, especialidades, disponibilidad y citas médicas. El proyecto está organizado como un monolito modular, con API REST y control de acceso por roles.
 
-- [Especificación de requisitos (IEEE 830)](docs/ERS_PiedraAzul_IEEE830_2026-II_FINAL.docx): requisitos del sistema.
-- [Documento de arquitectura (Corte 2)](docs/Documento-Piedra-azul-documento-arquitectura_corte2.docx): arquitectura y decisiones de diseño.
-- [MRP Piedrazul - Entrega 2](docs/F-DES-08_MRP_Piedrazul_Monolito_Entrega2_tercera_version.xlsx).
-- [Diagramas C4](docs/c4/README.md): vistas de contexto, contenedores y componentes.
-- [Vistas de arquitectura 4 + 1](docs/4%20+%201/README.md): vistas lógica, procesos, desarrollo, física y escenarios.
-- [Historias de usuario](docs/epicas/): funcionalidades organizadas por épicas.
+## Tecnologías
+
+- Backend: Java 21, Spring Boot y PostgreSQL.
+- Frontend: Vue 3, Vite y Node.js 22.18 o superior.
+
+## Requisitos
+
+Descargar Docker Desktop y los servicios de Docker CLI.
+
+## Ejecución local
+
+Desde la raíz del proyecto, construir los contenedores de Docker:
+
+```bash
+docker compose build --no-cache
+```
+
+Despues de crear los contenedores, hay que ejecutarlos:
+
+```bash
+docker compose up -d
+```
+
+Para apagarlo:
+
+```bash
+docker compose down -v
+```
+
+Para remover por completo el proyecto:
+
+```bash
+docker compose down --rmi all
+```
+
+## Puertos
+
+- La API del backend se ejecuta en `http://localhost:8080/api`.
+
+- La aplicacion web se ejecuta en `http://localhost:3000`.
+
+- La base de datos de postgres se ejecuta en `http://localhost:5432`.

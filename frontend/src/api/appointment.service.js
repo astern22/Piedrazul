@@ -91,6 +91,41 @@ export const appointmentService = {
     const response = await apiClient.delete(`/api/appointments/${id}`)
     return response.data
   },
+
+  async cancel(id, reason) {
+    const response = await apiClient.delete(`/api/appointments/me/cancel/${id}`, {
+      data: { reason },
+      params: { reason },
+    })
+    return response.data
+  },
+
+  /**
+   * Citas del paciente autenticado. El backend las resuelve desde el token,
+   * por lo que un paciente nunca puede ver citas de otros.
+   * @returns {Promise<Array<Object>>}
+   */
+  async getMine({ professionalId, date } = {}) {
+    const response = await apiClient.get('/api/appointments/me', {
+      params: { professionalId, date },
+    })
+    return response.data
+  },
+
+  async getByPatientId(patientId) {
+    const response = await apiClient.get(`/api/appointments/patient/${patientId}`)
+    return response.data
+  },
+
+  /**
+   * Obtiene el historial cronológico completo de citas de un paciente a partir de su cédula.
+   * @param {string} documentNumber - Cédula del paciente
+   * @returns {Promise<{patient: Object, appointments: Array}>}
+   */
+  async getHistoryByDocument(documentNumber) {
+    const response = await apiClient.get(`/api/appointments/patient/document/${encodeURIComponent(documentNumber)}/history`)
+    return response.data
+  }
 }
 
 export default appointmentService
