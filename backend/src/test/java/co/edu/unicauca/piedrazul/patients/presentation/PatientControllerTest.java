@@ -1,6 +1,7 @@
 package co.edu.unicauca.piedrazul.patients.presentation;
 
 import co.edu.unicauca.piedrazul.patients.application.PatientService;
+import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEntity;
 import co.edu.unicauca.piedrazul.patients.presentation.dto.PatientRequest;
 import co.edu.unicauca.piedrazul.patients.presentation.dto.PatientResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,7 +85,11 @@ class PatientControllerTest {
 
     @Test
     void testFindByCurrentUser() throws Exception {
-        when(patientService.findByCurrentUser("juanperez")).thenReturn(sampleResponse);
+        PatientEntity patientEntity = new PatientEntity();
+        patientEntity.setId(1L);
+
+        when(patientService.getMyPatient()).thenReturn(patientEntity);
+        when(patientService.findById(1L)).thenReturn(sampleResponse);
 
         TestingAuthenticationToken auth = new TestingAuthenticationToken("juanperez", null);
 

@@ -17,14 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-<<<<<<< Updated upstream:src/main/java/co/edu/unicauca/piedrazul/users/presentation/AuthController.java
-
     private final RegisterUserService registerUserService;
-
-=======
-    private final RegisterUserService registerUserService;
-
->>>>>>> Stashed changes:backend/src/main/java/co/edu/unicauca/piedrazul/users/presentation/AuthController.java
     public AuthController(RegisterUserService registerUserService) {
         this.registerUserService = registerUserService;
     }

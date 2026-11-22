@@ -16,13 +16,15 @@ Instala Java 21, Node.js, PostgreSQL y npm. Antes de iniciar la aplicación, con
 
 ## Ejecución local
 
-<<<<<<< Updated upstream
-Desde la raíz del proyecto, inicia el backend:
-=======
 (Opcional) Copiar `.env.example` a `.env` para cambiar contraseñas y URLs. Sin ese archivo se usan valores de desarrollo.
 
 Desde la raíz del proyecto, construir los contenedores de Docker:
->>>>>>> Stashed changes
+
+```bash
+docker compose up -d
+```
+
+O para iniciar el backend localmente:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
@@ -53,18 +55,14 @@ npm run build
 
 ## Documentación
 
-<<<<<<< Updated upstream
 - [Documento de requisitos IEEE 830](docs/ERS_PiedraAzul_IEEE830_2026-II_FINAL.docx)
 - [Documento de arquitectura](docs/Documento-Piedra-azul-documento-arquitectura_corte1.docx)
 - [Diagramas de arquitectura C4](docs/c4/README.md)
 - [Historias de usuario](docs/epicas/)
-=======
+
 - La API del backend se ejecuta en `http://localhost:8080/api`.
-
 - La aplicacion web se ejecuta en `http://localhost:3000`.
-
 - La base de datos de postgres se ejecuta en `http://localhost:5432`.
-
 - Keycloak se ejecuta en `http://localhost:8081` (consola de administración).
 
 ## Autenticación con Keycloak
