@@ -1,6 +1,5 @@
 package co.edu.unicauca.piedrazul.users.presentation;
 
-import co.edu.unicauca.piedrazul.users.application.LoginService;
 import co.edu.unicauca.piedrazul.users.application.RegisterUserService;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
 import co.edu.unicauca.piedrazul.users.presentation.dto.RegisterRequest;
@@ -16,7 +15,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,9 +29,6 @@ class AuthControllerTest {
 
     @Mock
     private RegisterUserService registerUserService;
-
-    @Mock
-    private LoginService loginService;
 
     @InjectMocks
     private AuthController authController;
@@ -70,23 +65,5 @@ class AuthControllerTest {
         ArgumentCaptor<RegisterRequest> captor = ArgumentCaptor.forClass(RegisterRequest.class);
         verify(registerUserService).register(captor.capture());
         assertEquals("1061789234", captor.getValue().documentNumber());
-    }
-
-    @Test
-    void testLogin() throws Exception {
-        when(loginService.login(eq("juanperez"), eq("Password123!"))).thenReturn("sample-jwt-token");
-
-        String jsonRequest = """
-                {
-                    "username": "juanperez",
-                    "password": "Password123!"
-                }
-                """;
-
-        mockMvc.perform(post("/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonRequest))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("sample-jwt-token"));
     }
 }

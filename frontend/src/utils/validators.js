@@ -150,6 +150,16 @@ export function hasErrors(errors) {
   return Object.keys(errors).length > 0
 }
 
+/**
+ * Nombre de usuario: entre 3 y 50 caracteres y sin espacios (Keycloak exige minimo 3).
+ */
+export function usernameFormat(value) {
+  return firstError(
+    minLength(value, 3, 'El usuario'),
+    noSpaces(value, 'El usuario')
+  )
+}
+
 // ─── Validadores por Formulario ───
 
 /**
@@ -160,7 +170,7 @@ export function validateRegisterForm({ username, password, fullName, email, docu
   return validateFields({
     username: firstError(
       required(username, 'El usuario'),
-      noSpaces(username, 'El usuario'),
+      usernameFormat(username),
       maxLength(username, 50, 'El usuario')
     ),
     password: firstError(
@@ -238,7 +248,7 @@ export function validateProfessionalRegistrationForm({
     ),
     username: firstError(
       required(username, 'El usuario'),
-      noSpaces(username, 'El usuario'),
+      usernameFormat(username),
       maxLength(username, 50, 'El usuario')
     ),
     email: firstError(
@@ -266,7 +276,7 @@ export function validateSchedulerForm({ fullName, username, email, password }) {
     ),
     username: firstError(
       required(username, 'El usuario'),
-      noSpaces(username, 'El usuario'),
+      usernameFormat(username),
       maxLength(username, 50, 'El usuario')
     ),
     email: firstError(

@@ -1,10 +1,26 @@
 import { ref, computed } from 'vue'
 import { authService } from '@/api'
+import keycloak from '@/keycloak'
 
 const token = ref(authService.getToken())
 const user = ref(authService.getCurrentUser())
 
-// Escucha el evento global emitido por el interceptor cuando un token caduca (401)
+/** Copia el estado de Keycloak (que no es reactivo) a las refs de Vue. */
+function syncState() {
+  token.value = authService.getToken()
+  user.value = authService.getCurrentUser()
+}
+
+// Keycloak notifica cada cambio de sesion; asi la UI reacciona sin recargar.
+keycloak.onReady = syncState
+keycloak.onAuthSuccess = syncState
+keycloak.onAuthRefreshSuccess = syncState
+keycloak.onAuthLogout = syncState
+keycloak.onTokenExpired = () => {
+  keycloak.updateToken(30).then(syncState).catch(syncState)
+}
+
+// Evento global emitido por el cliente HTTP cuando el backend responde 401
 if (typeof window !== 'undefined') {
   window.addEventListener('auth:unauthorized', () => {
     token.value = null
@@ -59,29 +75,27 @@ export function useAuth() {
   })
 
   /**
-   * Inicia sesion con credenciales y actualiza el estado reactivo.
+   * Redirige al login de Keycloak. Al volver, el estado reactivo se actualiza solo.
+   * @param {Object} [options] por ejemplo { redirectUri }
    */
-  async function login(credentials) {
-    const data = await authService.login(credentials)
-    token.value = data.token
-    user.value = authService.getCurrentUser()
-    return data
+  async function login(options = {}) {
+    return authService.login(options)
   }
 
   /**
-   * Registra un nuevo usuario en la base de datos.
+   * Registra un nuevo paciente (backend + Keycloak).
    */
   async function register(userData) {
     return await authService.register(userData)
   }
 
   /**
-   * Cierra la sesion activa y reinicia el estado reactivo.
+   * Cierra la sesion en Keycloak y reinicia el estado reactivo.
    */
   function logout() {
-    authService.logout()
     token.value = null
     user.value = null
+    return authService.logout()
   }
 
   return {

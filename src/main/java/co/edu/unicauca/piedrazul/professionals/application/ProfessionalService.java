@@ -5,11 +5,11 @@ import co.edu.unicauca.piedrazul.professionals.infrastructure.persistence.Profes
 import co.edu.unicauca.piedrazul.professionals.infrastructure.persistence.SpecialtyRepository;
 import co.edu.unicauca.piedrazul.professionals.presentation.dto.ProfessionalRegistrationRequest;
 import co.edu.unicauca.piedrazul.professionals.presentation.dto.ProfessionalRequest;
+import co.edu.unicauca.piedrazul.security.KeycloakAdminClient;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleRepository;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,20 +28,20 @@ public class ProfessionalService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final SpecialtyRepository specialtyRepository;
-    private final PasswordEncoder passwordEncoder;
+    private final KeycloakAdminClient keycloakAdminClient;
 
     public ProfessionalService(
             ProfessionalRepository repository,
             UserRepository userRepository,
             RoleRepository roleRepository,
             SpecialtyRepository specialtyRepository,
-            PasswordEncoder passwordEncoder) {
+            KeycloakAdminClient keycloakAdminClient) {
 
         this.repository = repository;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.specialtyRepository = specialtyRepository;
-        this.passwordEncoder = passwordEncoder;
+        this.keycloakAdminClient = keycloakAdminClient;
     }
 
     public ProfessionalEntity create(
@@ -67,7 +67,7 @@ public class ProfessionalService {
     }
 
     /**
-     * Crea la cuenta de usuario (rol PROFESSIONAL) y el profesional en un solo paso.
+     * Crea la cuenta de usuario (rol PROFESSIONAL, en Keycloak) y el profesional en un solo paso.
      */
     @Transactional
     public ProfessionalEntity register(ProfessionalRegistrationRequest request) {
@@ -80,6 +80,7 @@ public class ProfessionalService {
 
         String username = request.username().trim();
         String email = request.email().trim();
+        String fullName = request.fullName().trim();
 
         if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException(
@@ -98,25 +99,34 @@ public class ProfessionalService {
                 .orElseThrow(() ->
                         new IllegalStateException("Rol PROFESSIONAL no encontrado"));
 
-        UserEntity user = new UserEntity();
-        user.setUsername(username);
-        user.setFullName(request.fullName().trim());
-        user.setEmail(email);
-        user.setPassword(passwordEncoder.encode(request.password()));
-        user.setEnabled(true);
-        user.getRoles().add(professionalRole);
+        // La cuenta (credenciales y rol) se crea en Keycloak; aqui solo queda el perfil.
+        String keycloakUserId = keycloakAdminClient.createUser(
+                username, email, fullName, request.password(), "PROFESSIONAL");
 
-        UserEntity savedUser = userRepository.save(user);
+        try {
+            UserEntity user = new UserEntity();
+            user.setUsername(username);
+            user.setFullName(fullName);
+            user.setEmail(email);
+            user.setPassword(KeycloakAdminClient.LOCAL_PASSWORD_PLACEHOLDER);
+            user.setEnabled(true);
+            user.getRoles().add(professionalRole);
 
-        ProfessionalEntity professional = new ProfessionalEntity();
-        professional.setUserId(savedUser.getId());
-        professional.setSpecialtyId(request.specialtyId());
-        professional.setAppointmentIntervalMinutes(
-                request.appointmentIntervalMinutes()
-        );
-        professional.setActive(true);
+            UserEntity savedUser = userRepository.save(user);
 
-        return repository.save(professional);
+            ProfessionalEntity professional = new ProfessionalEntity();
+            professional.setUserId(savedUser.getId());
+            professional.setSpecialtyId(request.specialtyId());
+            professional.setAppointmentIntervalMinutes(
+                    request.appointmentIntervalMinutes()
+            );
+            professional.setActive(true);
+
+            return repository.save(professional);
+        } catch (RuntimeException e) {
+            keycloakAdminClient.deleteUser(keycloakUserId);
+            throw e;
+        }
     }
 
     /**

@@ -1,68 +1,49 @@
 import axios from 'axios'
+import keycloak from '../keycloak.js'
 
+/**
+ * Clave historica del token en localStorage. Ya no se usa: el token vive en memoria
+ * dentro del adaptador de Keycloak. Se conserva solo por compatibilidad de importaciones.
+ */
 export const TOKEN_KEY = 'piedrazul_token'
 
 /**
- * Obtiene el token JWT almacenado.
+ * Obtiene el access token (JWT) actual emitido por Keycloak.
  * @returns {string|null}
  */
 export function getToken() {
-  return localStorage.getItem(TOKEN_KEY)
+  return keycloak.authenticated && keycloak.token ? keycloak.token : null
 }
 
 /**
- * Almacena el token JWT.
- * @param {string} token
+ * Compatibilidad: el token lo gestiona Keycloak, no hay nada que almacenar a mano.
  */
-export function setToken(token) {
-  if (token) {
-    localStorage.setItem(TOKEN_KEY, token)
-  }
-}
+export function setToken() {}
 
 /**
- * Elimina el token JWT almacenado.
+ * Descarta el token en memoria (la sesion de Keycloak sigue viva hasta hacer logout).
  */
 export function removeToken() {
-  localStorage.removeItem(TOKEN_KEY)
-}
-
-/**
- * Decodifica el payload de un token JWT.
- * @param {string} token
- * @returns {object|null}
- */
-export function decodeToken(token = getToken()) {
-  if (!token) return null
-  try {
-    const parts = token.split('.')
-    if (parts.length < 2) return null
-    const base64Url = parts[1]
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    )
-    return JSON.parse(jsonPayload)
-  } catch (error) {
-    console.error('Error al decodificar token JWT:', error)
-    return null
+  if (keycloak.authenticated) {
+    keycloak.clearToken()
   }
 }
 
 /**
- * Verifica si el token actual esta expirado o no existe.
- * @param {string} token
+ * Payload decodificado del access token actual.
+ * @returns {object|null}
+ */
+export function decodeToken() {
+  return keycloak.authenticated && keycloak.tokenParsed ? keycloak.tokenParsed : null
+}
+
+/**
+ * Indica si no hay token o ya expiro.
  * @returns {boolean}
  */
-export function isTokenExpired(token = getToken()) {
-  if (!token) return true
-  const decoded = decodeToken(token)
-  if (!decoded || !decoded.exp) return true
-  const currentTime = Math.floor(Date.now() / 1000)
-  return decoded.exp < currentTime
+export function isTokenExpired() {
+  if (!keycloak.authenticated || !keycloak.token) return true
+  return keycloak.isTokenExpired()
 }
 
 /**
@@ -81,12 +62,22 @@ const apiClient = axios.create({
   timeout: 15000,
 })
 
-// Interceptor de Peticion: adjuntar token JWT
+// Interceptor de Peticion: renueva el token si esta por vencer y lo adjunta
 apiClient.interceptors.request.use(
-  config => {
-    const token = getToken()
-    if (token && !isTokenExpired(token)) {
-      config.headers.Authorization = `Bearer ${token}`
+  async config => {
+    if (keycloak.authenticated) {
+      try {
+        await keycloak.updateToken(30)
+      } catch (error) {
+        // La sesion de Keycloak expiro: se pide iniciar sesion de nuevo
+        window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+        keycloak.login({ redirectUri: window.location.href })
+        return Promise.reject({
+          status: 401,
+          message: 'La sesion expiro. Redirigiendo al inicio de sesion...',
+        })
+      }
+      config.headers.Authorization = `Bearer ${keycloak.token}`
     }
     return config
   },

@@ -1,5 +1,6 @@
 package co.edu.unicauca.piedrazul.users.application;
 
+import co.edu.unicauca.piedrazul.security.KeycloakAdminClient;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleRepository;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -28,7 +28,7 @@ class SchedulerUserServiceTest {
     private RoleRepository roleRepository;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private KeycloakAdminClient keycloakAdminClient;
 
     @InjectMocks
     private SchedulerUserService service;
@@ -38,24 +38,32 @@ class SchedulerUserServiceTest {
                 "Ana Gomez", "agomez", "agomez@piedrazul.com", "secreto123");
     }
 
-    @Test
-    void testCreateScheduler_AssignsSchedulerRole() {
+    private RoleEntity schedulerRole() {
         RoleEntity role = new RoleEntity();
         role.setName("SCHEDULER");
+        return role;
+    }
+
+    @Test
+    void testCreateScheduler_AssignsSchedulerRole() {
+        RoleEntity role = schedulerRole();
 
         when(userRepository.existsByUsername("agomez")).thenReturn(false);
         when(userRepository.existsByEmail("agomez@piedrazul.com")).thenReturn(false);
         when(roleRepository.findByName("SCHEDULER")).thenReturn(Optional.of(role));
-        when(passwordEncoder.encode("secreto123")).thenReturn("hash");
+        when(keycloakAdminClient.createUser(
+                "agomez", "agomez@piedrazul.com", "Ana Gomez", "secreto123", "SCHEDULER"))
+                .thenReturn("kc-1");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(i -> i.getArgument(0));
 
         UserEntity created = service.createScheduler(request());
 
         assertEquals("agomez", created.getUsername());
         assertEquals("Ana Gomez", created.getFullName());
-        assertEquals("hash", created.getPassword());
+        assertEquals(KeycloakAdminClient.LOCAL_PASSWORD_PLACEHOLDER, created.getPassword());
         assertTrue(created.isEnabled());
         assertTrue(created.getRoles().contains(role));
+        verify(keycloakAdminClient, never()).deleteUser(any());
     }
 
     @Test
@@ -66,6 +74,7 @@ class SchedulerUserServiceTest {
                 () -> service.createScheduler(request()));
 
         assertEquals("El nombre de usuario ya esta en uso", ex.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
         verify(userRepository, never()).save(any());
     }
 
@@ -78,6 +87,20 @@ class SchedulerUserServiceTest {
                 () -> service.createScheduler(request()));
 
         assertEquals("El correo electronico ya esta registrado", ex.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testCreateScheduler_DatabaseFailure_RollsBackKeycloakUser() {
+        when(roleRepository.findByName("SCHEDULER")).thenReturn(Optional.of(schedulerRole()));
+        when(keycloakAdminClient.createUser(
+                "agomez", "agomez@piedrazul.com", "Ana Gomez", "secreto123", "SCHEDULER"))
+                .thenReturn("kc-1");
+        when(userRepository.save(any(UserEntity.class))).thenThrow(new RuntimeException("db error"));
+
+        assertThrows(RuntimeException.class, () -> service.createScheduler(request()));
+
+        verify(keycloakAdminClient).deleteUser("kc-1");
     }
 }
