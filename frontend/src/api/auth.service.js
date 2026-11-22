@@ -1,88 +1,82 @@
-import apiClient, {
-  getToken,
-  setToken,
-  removeToken,
-  decodeToken,
-  isTokenExpired,
-} from './client.js'
+import apiClient from './client.js'
+import keycloak from '../keycloak.js'
 
 /**
- * Servicio de Autenticacion para interactuar con /auth
+ * Servicio de autenticacion. El inicio y cierre de sesion los gestiona Keycloak
+ * (OpenID Connect); el registro de pacientes sigue pasando por el backend (/auth/register).
  */
 export const authService = {
   /**
-   * Inicia sesion con usuario y contraseña.
-   * Guarda automaticamente el token JWT obtenido.
-   * @param {Object} credentials
-   * @param {string} credentials.username
-   * @param {string} credentials.password
-   * @returns {Promise<{token: string}>}
+   * Redirige al formulario de inicio de sesion de Keycloak.
+   * @param {Object} [options]
+   * @param {string} [options.redirectUri] URL absoluta a la que volver tras iniciar sesion
    */
-  async login({ username, password }) {
-    const response = await apiClient.post('/auth/login', { username, password })
-    if (response.data && response.data.token) {
-      setToken(response.data.token)
-    }
-    return response.data
+  login(options = {}) {
+    return keycloak.login(options)
   },
 
   /**
-   * Registra un nuevo usuario en la plataforma.
+   * Registra un nuevo paciente. El backend crea la cuenta en Keycloak y el perfil local.
    * @param {Object} userData
    * @param {string} userData.username
    * @param {string} userData.password
    * @param {string} userData.fullName
    * @param {string} userData.email
+   * @param {string} userData.documentNumber
    * @returns {Promise<{username: string}>}
    */
- async register({ username, password, fullName, email, documentNumber }) {
-  const response = await apiClient.post('/auth/register', {
-    username,
-    password,
-    fullName,
-    email,
-    documentNumber,
-  })
-  return response.data
-},
-
-  /**
-   * Cierra la sesion activa eliminando el token.
-   */
-  logout() {
-    removeToken()
+  async register({ username, password, fullName, email, documentNumber }) {
+    const response = await apiClient.post('/auth/register', {
+      username,
+      password,
+      fullName,
+      email,
+      documentNumber,
+    })
+    return response.data
   },
 
   /**
-   * Obtiene el token almacenado.
+   * Cierra la sesion en Keycloak y vuelve a la pagina de inicio.
+   * @param {Object} [options]
+   */
+  logout(options = {}) {
+    return keycloak.logout({ redirectUri: window.location.origin, ...options })
+  },
+
+  /**
+   * Obtiene el access token actual.
    * @returns {string|null}
    */
   getToken() {
-    return getToken()
+    return keycloak.authenticated && keycloak.token ? keycloak.token : null
   },
 
   /**
-   * Verifica si el usuario actual tiene una sesion valida y no expirada.
+   * Indica si hay una sesion autenticada en Keycloak.
    * @returns {boolean}
    */
   isAuthenticated() {
-    const token = getToken()
-    return Boolean(token && !isTokenExpired(token))
+    return Boolean(keycloak.authenticated && keycloak.token)
   },
 
   /**
-   * Retorna la informacion decodificada del usuario autenticado.
-   * Incluye roles si el JWT los contiene en el claim "roles".
-   * @returns {{username: string, roles: string[], exp?: number, iat?: number}|null}
+   * Informacion del usuario autenticado, tomada del token de Keycloak.
+   * Los roles salen del claim "realm_access.roles".
+   * @returns {{username: string, fullName?: string, email?: string, roles: string[], exp?: number, iat?: number}|null}
    */
   getCurrentUser() {
-    const decoded = decodeToken()
-    if (!decoded) return null
+    const parsed = keycloak.tokenParsed
+    if (!keycloak.authenticated || !parsed) return null
+
+    const roles = parsed.realm_access?.roles
     return {
-      username: decoded.sub,
-      roles: Array.isArray(decoded.roles) ? decoded.roles : [],
-      exp: decoded.exp,
-      iat: decoded.iat,
+      username: parsed.preferred_username || parsed.sub,
+      fullName: parsed.name,
+      email: parsed.email,
+      roles: Array.isArray(roles) ? roles : [],
+      exp: parsed.exp,
+      iat: parsed.iat,
     }
   },
 }

@@ -1,4 +1,4 @@
-# Piedrazul
+# Piedra Azul
 
 ![Java](https://img.shields.io/badge/java-%23ED8B00.svg?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Spring](https://img.shields.io/badge/spring-%236DB33F.svg?style=for-the-badge&logo=spring&logoColor=white)
@@ -10,6 +10,7 @@ Sistema web para gestionar pacientes, profesionales, especialidades, disponibili
 
 - Backend: Java 21, Spring Boot y PostgreSQL.
 - Frontend: Vue 3, Vite y Node.js 22.18 o superior.
+- Autenticación y autorización: Keycloak (OpenID Connect, tokens JWT).
 
 ## Requisitos
 
@@ -17,7 +18,13 @@ Descargar Docker Desktop y los servicios de Docker CLI.
 
 ## Ejecución local
 
-Desde la raíz del proyecto, construir los contenedores de Docker:
+Desde la raíz del proyecto, inicia el backend:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+En otra terminal, inicia el frontend:
 
 ```bash
 docker compose build --no-cache
@@ -41,6 +48,15 @@ Para remover por completo el proyecto:
 docker compose down --rmi all
 ```
 
+### Usuarios de prueba keycloak
+
+| Usuario      | Contraseña  | Rol                                       |
+| ------------ | ----------- | ----------------------------------------- |
+| `admin`      | `Admin123!` | ADMIN                                     |
+| `medico1`    | `1234`      | PROFESSIONAL                              |
+| `paciente1`  | `1234`      | PATIENT                                   |
+| `terapeuta1` | `1234`      | PROFESSIONAL (deshabilitado para pruebas) |
+
 ## Puertos
 
 - La API del backend se ejecuta en `http://localhost:8080/api`.
@@ -48,3 +64,12 @@ docker compose down --rmi all
 - La aplicacion web se ejecuta en `http://localhost:3000`.
 
 - La base de datos de postgres se ejecuta en `http://localhost:5432`.
+
+- Consola de Keycloak: `http://localhost:8081`
+
+## Documentación
+
+- [Documento de requisitos IEEE 830](docs/ERS_PiedraAzul_IEEE830_2026-II_FINAL.docx)
+- [Documento de arquitectura](docs/Documento-Piedra-azul-documento-arquitectura_corte1.docx)
+- [Diagramas de arquitectura C4](docs/c4/README.md)
+- [Historias de usuario](docs/epicas/)

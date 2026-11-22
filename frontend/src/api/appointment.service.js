@@ -113,6 +113,9 @@ export const appointmentService = {
   },
 
   async getByPatientId(patientId) {
+    if (!patientId) {
+      return this.getMyAppointments()
+    }
     const response = await apiClient.get(`/api/appointments/patient/${patientId}`)
     return response.data
   },

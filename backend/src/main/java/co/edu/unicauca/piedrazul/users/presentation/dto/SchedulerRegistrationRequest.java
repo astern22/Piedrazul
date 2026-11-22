@@ -13,7 +13,7 @@ public record SchedulerRegistrationRequest(
         String fullName,
 
         @NotBlank
-        @Size(max = 50)
+        @Size(min = 3, max = 50)
         String username,
 
         @NotBlank

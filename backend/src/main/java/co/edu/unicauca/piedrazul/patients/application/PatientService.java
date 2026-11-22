@@ -3,6 +3,7 @@ package co.edu.unicauca.piedrazul.patients.application;
 import java.util.List;
 import java.util.Optional;
 
+import co.edu.unicauca.piedrazul.security.AuthenticatedUserService;
 import org.springframework.stereotype.Service;
 
 import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEntity;
@@ -17,10 +18,16 @@ public class PatientService {
 
     private final PatientRepository patientRepository;
     private final UserRepository userRepository;
+    private final AuthenticatedUserService authenticatedUserService;
 
-    public PatientService(PatientRepository patientRepository, UserRepository userRepository) {
+    public PatientService(
+            PatientRepository patientRepository,
+            UserRepository userRepository,
+            AuthenticatedUserService authenticatedUserService) {
+
         this.patientRepository = patientRepository;
         this.userRepository = userRepository;
+        this.authenticatedUserService = authenticatedUserService;
     }
 
     public PatientResponse create(PatientRequest request) {
@@ -131,6 +138,40 @@ public class PatientService {
             }
         }
         return PatientResponse.fromEntity(entity, fullName, email);
+    }
+
+    public PatientEntity getMyPatient() {
+        String username = null;
+        try {
+            username = authenticatedUserService.getUsername();
+        } catch (Exception ignored) {
+        }
+
+        String keycloakUserId = null;
+        try {
+            keycloakUserId = authenticatedUserService.getKeycloakUserId();
+        } catch (Exception ignored) {
+        }
+
+        UserEntity user = null;
+        if (keycloakUserId != null && !keycloakUserId.isBlank()) {
+            user = userRepository.findByKeycloakUserId(keycloakUserId).orElse(null);
+        }
+
+        if (user == null && username != null && !username.isBlank()) {
+            user = userRepository.findByUsername(username).orElse(null);
+            if (user != null && keycloakUserId != null && !keycloakUserId.isBlank() && user.getKeycloakUserId() == null) {
+                user.setKeycloakUserId(keycloakUserId);
+                userRepository.save(user);
+            }
+        }
+
+        if (user == null) {
+            throw new RuntimeException("Usuario no encontrado");
+        }
+
+        return patientRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("No se encontro un paciente vinculado a tu usuario"));
     }
 }
 

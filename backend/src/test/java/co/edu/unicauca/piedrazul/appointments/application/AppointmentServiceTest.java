@@ -3,6 +3,10 @@ package co.edu.unicauca.piedrazul.appointments.application;
 import co.edu.unicauca.piedrazul.appointments.infrastructure.persistence.AppointmentEntity;
 import co.edu.unicauca.piedrazul.appointments.infrastructure.persistence.AppointmentRepository;
 import co.edu.unicauca.piedrazul.appointments.presentation.command.CreateAppointmentCommand;
+import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEntity;
+import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
+import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserRepository;
 import co.edu.unicauca.piedrazul.patients.application.PatientService;
 import co.edu.unicauca.piedrazul.patients.presentation.dto.PatientResponse;
 import co.edu.unicauca.piedrazul.appointments.presentation.dto.PatientAppointmentHistoryResponse;
@@ -21,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,6 +39,12 @@ class AppointmentServiceTest {
 
     @Mock
     private AppointmentRepository repository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private PatientRepository patientRepository;
 
     @Mock
     private PatientService patientService;
@@ -147,7 +158,6 @@ class AppointmentServiceTest {
         verify(repository).findById(99L);
     }
 
-    @Test
     void testGetAppointmentsByProfessionalId_Found() {
         when(repository.findByProfessionalId(20L)).thenReturn(List.of(sampleEntity));
 
@@ -158,7 +168,6 @@ class AppointmentServiceTest {
         verify(repository).findByProfessionalId(20L);
     }
 
-    @Test
     void testGetAppointmentsByProfessionalId_NoAppointments_ReturnsEmptyList() {
         when(repository.findByProfessionalId(99L)).thenReturn(Collections.emptyList());
 
@@ -214,7 +223,6 @@ class AppointmentServiceTest {
         verify(repository).findByProfessionalIdAndAppointmentDate(20L, date);
     }
 
-    @Test
     void testFindAppointments_OnlyProfessional() {
         when(repository.findByProfessionalId(20L)).thenReturn(List.of(sampleEntity));
 

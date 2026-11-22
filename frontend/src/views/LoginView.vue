@@ -1,46 +1,33 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
-import { required } from '@/utils/validators'
 import AuthCardTemplate from '@/views/components/AuthCardTemplate.vue'
 
-const router = useRouter()
 const route = useRoute()
 const { login } = useAuth()
 
-const username = ref('')
-const password = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 
-async function handleSubmit() {
+/**
+ * El inicio de sesion lo gestiona Keycloak: se redirige a su formulario y, al volver,
+ * el usuario llega a la ruta que intentaba abrir (o a /appointments).
+ */
+async function handleLogin() {
   errorMessage.value = ''
-
-  const usernameErr = required(username.value, 'El usuario')
-  const passwordErr = required(password.value, 'La contraseña')
-
-  if (usernameErr || passwordErr) {
-    errorMessage.value = usernameErr || passwordErr
-    return
-  }
-
   isLoading.value = true
 
   try {
-    await login({
-      username: username.value.trim(),
-      password: password.value,
-    })
-
     const redirectPath = route.query.redirect || '/appointments'
 
-    router.push(redirectPath)
+    await login({
+      redirectUri: window.location.origin + redirectPath,
+    })
   } catch (error) {
     errorMessage.value =
       error?.message ||
-      'Credenciales invalidas. Por favor verifica tus datos.'
-  } finally {
+      'No se pudo conectar con el servidor de autenticacion. Intenta nuevamente.'
     isLoading.value = false
   }
 }
@@ -55,58 +42,29 @@ async function handleSubmit() {
       <div class="auth-login">
         <div class="auth-header">
           <h2>Iniciar Sesion</h2>
-          <p>Ingresa tus credenciales para acceder a Piedrazul</p>
+          <p>Accede a Piedrazul con tu cuenta</p>
         </div>
 
         <div v-if="errorMessage" class="alert alert-error">
           {{ errorMessage }}
         </div>
 
-        <form
-          class="auth-form"
-          @submit.prevent="handleSubmit"
-        >
-          <div class="form-group">
-            <label for="username">
-              Nombre de usuario
-            </label>
-
-            <input
-              id="username"
-              v-model="username"
-              type="text"
-              placeholder="ej. juanperez"
-              autocomplete="username"
-              required
-              :disabled="isLoading"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="password">
-              Contraseña
-            </label>
-
-            <input
-              id="password"
-              v-model="password"
-              type="password"
-              placeholder="••••••••"
-              autocomplete="current-password"
-              required
-              :disabled="isLoading"
-            />
-          </div>
+        <div class="auth-form">
+          <p class="auth-hint">
+            Seras redirigido al servicio de autenticacion seguro de Piedra Azul
+            para ingresar tu usuario y contraseña.
+          </p>
 
           <button
-            type="submit"
+            type="button"
             class="btn-submit"
             :disabled="isLoading"
+            @click="handleLogin"
           >
             <span v-if="isLoading" class="spinner"></span>
-            <span v-else>Entrar</span>
+            <span v-else>Ingresar</span>
           </button>
-        </form>
+        </div>
 
         <div class="auth-footer">
           <p>
@@ -177,34 +135,12 @@ async function handleSubmit() {
   gap: 20px;
 }
 
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.form-group label {
-  font-weight: 600;
-  color: #374151;
-}
-
-.form-group input {
-  padding: 13px 15px;
-
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-
-  font-size: 15px;
-  outline: none;
-
-  transition: 0.2s;
-}
-
-.form-group input:focus {
-  border-color: #7c3aed;
-
-  box-shadow:
-    0 0 0 3px rgba(124, 58, 237, 0.12);
+.auth-hint {
+  margin: 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .btn-submit {
@@ -221,6 +157,10 @@ async function handleSubmit() {
 
   cursor: pointer;
   transition: 0.2s;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-submit:hover {

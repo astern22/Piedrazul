@@ -8,7 +8,7 @@ import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleRepository;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserRepository;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import co.edu.unicauca.piedrazul.security.KeycloakAdminClient;
 import co.edu.unicauca.piedrazul.professionals.presentation.dto.ProfessionalRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,7 +40,7 @@ class ProfessionalServiceTest {
     private SpecialtyRepository specialtyRepository;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private KeycloakAdminClient keycloakAdminClient;
 
     @InjectMocks
     private ProfessionalService service;
@@ -157,7 +157,7 @@ class ProfessionalServiceTest {
         when(userRepository.existsByUsername("cperez")).thenReturn(false);
         when(userRepository.existsByEmail("cperez@piedrazul.com")).thenReturn(false);
         when(roleRepository.findByName("PROFESSIONAL")).thenReturn(Optional.of(role));
-        when(passwordEncoder.encode("secreto123")).thenReturn("hash");
+        when(keycloakAdminClient.createUser("cperez", "cperez@piedrazul.com", "Carlos Perez", "secreto123", "PROFESSIONAL")).thenReturn("kc-55");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(i -> {
             UserEntity u = i.getArgument(0);
             u.setId(55L);
@@ -180,7 +180,7 @@ class ProfessionalServiceTest {
                 org.mockito.ArgumentCaptor.forClass(UserEntity.class);
         verify(userRepository).save(captor.capture());
         assertEquals("Carlos Perez", captor.getValue().getFullName());
-        assertEquals("hash", captor.getValue().getPassword());
+        assertEquals(KeycloakAdminClient.LOCAL_PASSWORD_PLACEHOLDER, captor.getValue().getPassword());
         assertTrue(captor.getValue().getRoles().contains(role));
     }
 

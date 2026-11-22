@@ -1,21 +1,25 @@
 package co.edu.unicauca.piedrazul.security;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Seguridad de la API como "resource server" de Keycloak: cada peticion debe traer
+ * {@code Authorization: Bearer <access_token>} emitido por el realm de Keycloak.
+ * La autenticacion (login) ya no la hace el backend.
+ */
 @Configuration
 public class SecurityConfig {
-
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -23,6 +27,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Registro de pacientes (el login lo hace Keycloak)
                         .requestMatchers(
                                 "/auth/**")
                         .permitAll()
@@ -59,8 +64,29 @@ public class SecurityConfig {
 
                         .anyRequest()
                         .authenticated())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(new KeycloakJwtAuthenticationConverter())));
 
         return http.build();
+    }
+
+    /**
+     * Verifica la firma con las claves publicas de Keycloak (jwk-set-uri) y comprueba que el
+     * emisor ({@code iss}) y la vigencia del token sean validos.
+     * <p>
+     * El emisor es la URL publica de Keycloak (la que ve el navegador), mientras que las claves
+     * se descargan de una URL que puede ser distinta (por ejemplo {@code http://keycloak:8080}
+     * dentro de Docker). Por eso no se usa {@code issuer-uri} para autoconfigurar el decoder.
+     */
+    @Bean
+    public JwtDecoder jwtDecoder(
+            @Value("${keycloak.issuer-uri:http://localhost:8081/realms/piedrazul}") String issuerUri,
+            @Value("${keycloak.jwk-set-uri:http://localhost:8081/realms/piedrazul/protocol/openid-connect/certs}")
+            String jwkSetUri) {
+
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        OAuth2TokenValidator<Jwt> validator = JwtValidators.createDefaultWithIssuer(issuerUri);
+        decoder.setJwtValidator(validator);
+        return decoder;
     }
 }

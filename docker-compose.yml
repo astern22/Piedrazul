@@ -8,12 +8,29 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/piedrazuldb?currentSchema=piedrazul
       SPRING_DATASOURCE_USERNAME: piedrazul_admin
       SPRING_DATASOURCE_PASSWORD: Piedrazul123.
+      # --- Keycloak ---
+      # El "iss" de los tokens es la URL publica de Keycloak (la que ve el navegador).
+      KEYCLOAK_REALM: piedrazul
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}/realms/piedrazul
+      # Dentro de la red de Docker el backend llega a Keycloak por su nombre de servicio.
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/piedrazul/protocol/openid-connect/certs
+      KEYCLOAK_ADMIN_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN_CLIENT_ID: piedrazul-backend
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${BACKEND_CLIENT_SECRET:-backend-dev-secret}
     depends_on:
       db:
         condition: service_healthy
+      keycloak:
+        condition: service_started
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Se incrustan en el build de Vite (el navegador las usa para hablar con Keycloak).
+        VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+        VITE_KEYCLOAK_REALM: piedrazul
+        VITE_KEYCLOAK_CLIENT_ID: piedrazul-frontend
     ports:
       - "3000:80"
     depends_on:
@@ -40,5 +57,49 @@ services:
       retries: 5
       start_period: 10s
 
+  # Base de datos propia de Keycloak (separada de la de la aplicacion).
+  keycloak-db:
+    image: postgres:16
+    restart: always
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U keycloak -d keycloak" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    # start-dev: modo desarrollo (HTTP, sin TLS). Para produccion usar "start" con HTTPS.
+    command: start-dev --import-realm
+    restart: always
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HTTP_ENABLED: "true"
+      # URL publica fija: asi el "iss" de los tokens es siempre el mismo
+      # sin importar si se accede desde el navegador o desde la red de Docker.
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8081}
+      # Se sustituye dentro de keycloak/piedrazul-realm.json (client "piedrazul-backend").
+      BACKEND_CLIENT_SECRET: ${BACKEND_CLIENT_SECRET:-backend-dev-secret}
+    volumes:
+      - ./keycloak/piedrazul-realm.json:/opt/keycloak/data/import/piedrazul-realm.json:ro
+    ports:
+      - "8081:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+
 volumes:
   db-data:
+  keycloak-db-data:

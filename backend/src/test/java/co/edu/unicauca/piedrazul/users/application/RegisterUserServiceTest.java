@@ -2,6 +2,7 @@ package co.edu.unicauca.piedrazul.users.application;
 
 import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientEntity;
 import co.edu.unicauca.piedrazul.patients.infrastructure.persistence.PatientRepository;
+import co.edu.unicauca.piedrazul.security.KeycloakAdminClient;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleEntity;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.RoleRepository;
 import co.edu.unicauca.piedrazul.users.infrastructure.persistence.UserEntity;
@@ -14,7 +15,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
@@ -26,6 +26,7 @@ import static org.mockito.Mockito.*;
 class RegisterUserServiceTest {
 
     private static final String DOCUMENT_NUMBER = "1061789234";
+    private static final String KEYCLOAK_ID = "kc-user-id-1";
 
     @Mock
     private UserRepository userRepository;
@@ -37,7 +38,7 @@ class RegisterUserServiceTest {
     private PatientRepository patientRepository;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private KeycloakAdminClient keycloakAdminClient;
 
     @InjectMocks
     private RegisterUserService registerUserService;
@@ -54,8 +55,10 @@ class RegisterUserServiceTest {
     }
 
     private void stubSuccessfulUserCreation() {
-        when(passwordEncoder.encode("Secret123!")).thenReturn("hashedPassword");
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole));
+        when(keycloakAdminClient.createUser(
+                "juanperez", "juan@example.com", "Juan Perez", "Secret123!", "PATIENT"))
+                .thenReturn(KEYCLOAK_ID);
         when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
             UserEntity u = invocation.getArgument(0);
             u.setId(10L);
@@ -75,13 +78,16 @@ class RegisterUserServiceTest {
         assertEquals("juanperez", result.getUsername());
         assertEquals("Juan Perez", result.getFullName());
         assertEquals("juan@example.com", result.getEmail());
-        assertEquals("hashedPassword", result.getPassword());
+        // La contrasena real vive en Keycloak, no en la base de datos
+        assertEquals(KeycloakAdminClient.LOCAL_PASSWORD_PLACEHOLDER, result.getPassword());
         assertTrue(result.isEnabled());
         assertTrue(result.getRoles().contains(patientRole));
 
-        verify(passwordEncoder).encode("Secret123!");
+        verify(keycloakAdminClient).createUser(
+                "juanperez", "juan@example.com", "Juan Perez", "Secret123!", "PATIENT");
         verify(roleRepository).findByName("PATIENT");
         verify(userRepository).save(any(UserEntity.class));
+        verify(keycloakAdminClient, never()).deleteUser(any());
 
         ArgumentCaptor<PatientEntity> captor = ArgumentCaptor.forClass(PatientEntity.class);
         verify(patientRepository).save(captor.capture());
@@ -136,14 +142,42 @@ class RegisterUserServiceTest {
         );
 
         assertEquals("Ya existe una cuenta asociada a este numero de documento", exception.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
         verify(userRepository, never()).save(any());
         verify(patientRepository, never()).save(any());
     }
 
     @Test
+    void testRegister_UsernameAlreadyExists_ThrowsException() {
+        when(patientRepository.findByDocumentNumber(DOCUMENT_NUMBER)).thenReturn(Optional.empty());
+        when(userRepository.existsByUsername("juanperez")).thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                registerUserService.register(request)
+        );
+
+        assertEquals("El nombre de usuario ya esta en uso", exception.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testRegister_EmailAlreadyExists_ThrowsException() {
+        when(patientRepository.findByDocumentNumber(DOCUMENT_NUMBER)).thenReturn(Optional.empty());
+        when(userRepository.existsByEmail("juan@example.com")).thenReturn(true);
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                registerUserService.register(request)
+        );
+
+        assertEquals("El correo electronico ya esta registrado", exception.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void testRegister_RoleNotFound_ThrowsException() {
         when(patientRepository.findByDocumentNumber(DOCUMENT_NUMBER)).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(anyString())).thenReturn("hashedPassword");
         when(roleRepository.findByName("PATIENT")).thenReturn(Optional.empty());
 
         RuntimeException exception = assertThrows(RuntimeException.class, () ->
@@ -151,7 +185,23 @@ class RegisterUserServiceTest {
         );
 
         assertEquals("Rol PATIENT no encontrado", exception.getMessage());
+        verifyNoInteractions(keycloakAdminClient);
         verify(userRepository, never()).save(any());
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
+    void testRegister_DatabaseFailure_RollsBackKeycloakUser() {
+        when(patientRepository.findByDocumentNumber(DOCUMENT_NUMBER)).thenReturn(Optional.empty());
+        when(roleRepository.findByName("PATIENT")).thenReturn(Optional.of(patientRole));
+        when(keycloakAdminClient.createUser(
+                "juanperez", "juan@example.com", "Juan Perez", "Secret123!", "PATIENT"))
+                .thenReturn(KEYCLOAK_ID);
+        when(userRepository.save(any(UserEntity.class))).thenThrow(new RuntimeException("db error"));
+
+        assertThrows(RuntimeException.class, () -> registerUserService.register(request));
+
+        verify(keycloakAdminClient).deleteUser(KEYCLOAK_ID);
         verify(patientRepository, never()).save(any());
     }
 }

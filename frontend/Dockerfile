@@ -3,6 +3,16 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+
+# Configuracion de Keycloak que Vite incrusta en el build (la usa el navegador).
+# Se sobrescribe desde docker-compose.yml (build.args).
+ARG VITE_KEYCLOAK_URL=http://localhost:8081
+ARG VITE_KEYCLOAK_REALM=piedrazul
+ARG VITE_KEYCLOAK_CLIENT_ID=piedrazul-frontend
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL \
+    VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM \
+    VITE_KEYCLOAK_CLIENT_ID=$VITE_KEYCLOAK_CLIENT_ID
+
 RUN npm run build
 
 # production stage
