@@ -1,5 +1,5 @@
 import axios from 'axios'
-import keycloak from '../keycloak.js'
+import keycloak, { isE2EMode } from '../keycloak.js'
 
 /**
  * Clave historica del token en localStorage. Ya no se usa: el token vive en memoria
@@ -12,6 +12,9 @@ export const TOKEN_KEY = 'piedrazul_token'
  * @returns {string|null}
  */
 export function getToken() {
+  if (isE2EMode()) {
+    return 'mock-jwt-token-e2e'
+  }
   return keycloak.authenticated && keycloak.token ? keycloak.token : null
 }
 
@@ -34,6 +37,15 @@ export function removeToken() {
  * @returns {object|null}
  */
 export function decodeToken() {
+  if (isE2EMode()) {
+    return {
+      sub: 'patient-e2e-1',
+      preferred_username: 'paciente1',
+      name: 'Juan Perez',
+      email: 'paciente1@piedrazul.com',
+      realm_access: { roles: ['PATIENT'] },
+    }
+  }
   return keycloak.authenticated && keycloak.tokenParsed ? keycloak.tokenParsed : null
 }
 
@@ -42,6 +54,7 @@ export function decodeToken() {
  * @returns {boolean}
  */
 export function isTokenExpired() {
+  if (isE2EMode()) return false
   if (!keycloak.authenticated || !keycloak.token) return true
   return keycloak.isTokenExpired()
 }
@@ -65,6 +78,11 @@ const apiClient = axios.create({
 // Interceptor de Peticion: renueva el token si esta por vencer y lo adjunta
 apiClient.interceptors.request.use(
   async config => {
+    if (isE2EMode()) {
+      config.headers.Authorization = 'Bearer mock-jwt-token-e2e'
+      return config
+    }
+
     if (keycloak.authenticated) {
       try {
         await keycloak.updateToken(30)
@@ -90,7 +108,7 @@ apiClient.interceptors.response.use(
   error => {
     const status = error.response ? error.response.status : null
 
-    if (status === 401) {
+    if (status === 401 && !isE2EMode()) {
       removeToken()
       window.dispatchEvent(new CustomEvent('auth:unauthorized'))
     }

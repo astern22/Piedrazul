@@ -4,6 +4,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 infra/
+
+# Test outputs
+node_modules/
+test-results/
+playwright-report/
+blob-report/
 .env
 _to_delete/
 ### STS ###
@@ -35,3 +41,9 @@ build/
 .vscode/
 
 infra/
+
+# Test outputs
+node_modules/
+test-results/
+playwright-report/
+blob-report/
