@@ -586,8 +586,8 @@ function openCancelModal(item) {
   showCancelModal.value = true;
 }
 
-function closeCancelModal() {
-  if (isCancelling.value) return;
+function closeCancelModal(force = false) {
+  if (isCancelling.value && force !== true) return;
   showCancelModal.value = false;
   cancellingAppointment.value = null;
   cancellationReason.value = "";
@@ -615,7 +615,7 @@ async function confirmCancelAppointment() {
       ? ` (${dateFormatted} ${apt.startTime.substring(0, 5)} - ${apt.endTime.substring(0, 5)})`
       : "";
     successMessage.value = `Cita #${id} cancelada exitosamente. El espacio${slotInfo} ha quedado liberado.`;
-    closeCancelModal();
+    closeCancelModal(true);
     await fetchAppointments();
     if (showCreateForm.value && form.value.professionalId && form.value.appointmentDate) {
       await fetchAvailableSlots();

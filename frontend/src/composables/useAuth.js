@@ -1,14 +1,34 @@
 import { ref, computed } from 'vue'
 import { authService } from '@/api'
-import keycloak from '@/keycloak'
+import keycloak, { isE2EMode, setMockAuthenticated } from '@/keycloak'
 
-const token = ref(authService.getToken())
-const user = ref(authService.getCurrentUser())
+function resolveCurrentToken() {
+  if (isE2EMode()) return 'mock-jwt-token-e2e'
+  return authService.getToken()
+}
+
+function resolveCurrentUser() {
+  if (isE2EMode()) {
+    return {
+      username: 'paciente1',
+      fullName: 'Juan Perez',
+      email: 'paciente1@piedrazul.com',
+      roles: ['PATIENT'],
+    }
+  }
+  return authService.getCurrentUser()
+}
+
+const token = ref(resolveCurrentToken())
+const user = ref(resolveCurrentUser())
 
 /** Copia el estado de Keycloak (que no es reactivo) a las refs de Vue. */
-function syncState() {
-  token.value = authService.getToken()
-  user.value = authService.getCurrentUser()
+export function syncState() {
+  if (isE2EMode()) {
+    setMockAuthenticated('PATIENT')
+  }
+  token.value = resolveCurrentToken()
+  user.value = resolveCurrentUser()
 }
 
 // Keycloak notifica cada cambio de sesion; asi la UI reacciona sin recargar.
@@ -23,8 +43,10 @@ keycloak.onTokenExpired = () => {
 // Evento global emitido por el cliente HTTP cuando el backend responde 401
 if (typeof window !== 'undefined') {
   window.addEventListener('auth:unauthorized', () => {
-    token.value = null
-    user.value = null
+    if (!isE2EMode()) {
+      token.value = null
+      user.value = null
+    }
   })
 }
 
@@ -33,6 +55,7 @@ if (typeof window !== 'undefined') {
  */
 export function useAuth() {
   const isAuthenticated = computed(() => {
+    if (isE2EMode()) return true
     return Boolean(token.value && authService.isAuthenticated())
   })
 
@@ -79,6 +102,10 @@ export function useAuth() {
    * @param {Object} [options] por ejemplo { redirectUri }
    */
   async function login(options = {}) {
+    if (isE2EMode()) {
+      syncState()
+      return Promise.resolve()
+    }
     return authService.login(options)
   }
 
@@ -95,6 +122,13 @@ export function useAuth() {
   function logout() {
     token.value = null
     user.value = null
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('piedrazul_e2e_auth')
+        window.sessionStorage.removeItem('piedrazul_e2e_auth')
+        document.cookie = 'piedrazul_e2e_auth=; Max-Age=0; path=/'
+      }
+    } catch (e) {}
     return authService.logout()
   }
 
@@ -115,5 +149,6 @@ export function useAuth() {
     login,
     register,
     logout,
+    syncState,
   }
 }

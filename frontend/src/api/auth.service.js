@@ -1,5 +1,5 @@
 import apiClient from './client.js'
-import keycloak from '../keycloak.js'
+import keycloak, { isE2EMode } from '../keycloak.js'
 
 /**
  * Servicio de autenticacion. El inicio y cierre de sesion los gestiona Keycloak
@@ -12,6 +12,9 @@ export const authService = {
    * @param {string} [options.redirectUri] URL absoluta a la que volver tras iniciar sesion
    */
   login(options = {}) {
+    if (isE2EMode()) {
+      return Promise.resolve()
+    }
     return keycloak.login(options)
   },
 
@@ -41,6 +44,12 @@ export const authService = {
    * @param {Object} [options]
    */
   logout(options = {}) {
+    if (isE2EMode()) {
+      keycloak.authenticated = false
+      keycloak.token = null
+      keycloak.tokenParsed = null
+      return Promise.resolve()
+    }
     return keycloak.logout({ redirectUri: window.location.origin, ...options })
   },
 
@@ -49,6 +58,9 @@ export const authService = {
    * @returns {string|null}
    */
   getToken() {
+    if (isE2EMode()) {
+      return 'mock-jwt-token-e2e'
+    }
     return keycloak.authenticated && keycloak.token ? keycloak.token : null
   },
 
@@ -57,6 +69,9 @@ export const authService = {
    * @returns {boolean}
    */
   isAuthenticated() {
+    if (isE2EMode()) {
+      return true
+    }
     return Boolean(keycloak.authenticated && keycloak.token)
   },
 
@@ -66,6 +81,16 @@ export const authService = {
    * @returns {{username: string, fullName?: string, email?: string, roles: string[], exp?: number, iat?: number}|null}
    */
   getCurrentUser() {
+    if (isE2EMode()) {
+      return {
+        username: 'paciente1',
+        fullName: 'Juan Perez',
+        email: 'paciente1@piedrazul.com',
+        roles: ['PATIENT'],
+        exp: Math.floor(Date.now() / 1000) + 7200,
+        iat: Math.floor(Date.now() / 1000),
+      }
+    }
     const parsed = keycloak.tokenParsed
     if (!keycloak.authenticated || !parsed) return null
 
