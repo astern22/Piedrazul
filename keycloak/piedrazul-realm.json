@@ -1,0 +1,125 @@
+{
+  "realm": "piedrazul",
+  "displayName": "Clinica Piedra Azul",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Administrador del sistema" },
+      { "name": "PATIENT", "description": "Paciente" },
+      { "name": "PROFESSIONAL", "description": "Profesional (medico / terapeuta)" },
+      { "name": "SCHEDULER", "description": "Agendador de citas" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "piedrazul-frontend",
+      "name": "Piedrazul Frontend (SPA)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "http://localhost:3000",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      }
+    },
+    {
+      "clientId": "piedrazul-backend",
+      "name": "Piedrazul Backend (Admin API)",
+      "description": "Cliente confidencial que usa el backend para crear usuarios en Keycloak (registro de pacientes, agendadores y profesionales).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${BACKEND_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-piedrazul-backend",
+      "enabled": true,
+      "serviceAccountClientId": "piedrazul-backend",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users",
+          "view-realm"
+        ]
+      }
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Administrador",
+      "lastName": "Piedrazul",
+      "email": "admin@piedrazul.com",
+      "credentials": [
+        { "type": "password", "value": "Admin123!", "temporary": false }
+      ],
+      "realmRoles": [ "ADMIN" ]
+    },
+    {
+      "username": "medico1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carlos",
+      "lastName": "Perez",
+      "email": "medico1@piedrazul.com",
+      "credentials": [
+        { "type": "password", "value": "1234", "temporary": false }
+      ],
+      "realmRoles": [ "PROFESSIONAL" ]
+    },
+    {
+      "username": "terapeuta1",
+      "enabled": false,
+      "emailVerified": true,
+      "firstName": "Carlos",
+      "lastName": "Perez",
+      "email": "terapeuta1@piedrazul.com",
+      "credentials": [
+        { "type": "password", "value": "1234", "temporary": false }
+      ],
+      "realmRoles": [ "PROFESSIONAL" ]
+    },
+    {
+      "username": "paciente1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Juan",
+      "lastName": "Perez",
+      "email": "paciente1@piedrazul.com",
+      "credentials": [
+        { "type": "password", "value": "1234", "temporary": false }
+      ],
+      "realmRoles": [ "PATIENT" ]
+    }
+  ]
+}

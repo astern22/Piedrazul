@@ -1,0 +1,52 @@
+@startuml
+skinparam linetype ortho
+left to right direction
+title Vista de Escenarios
+
+actor Paciente
+actor Agendador
+actor Profesional
+actor Administrador
+actor "Keycloak" as KC <<sistema>>
+
+usecase "Registrarse" as UC_Registrarse
+usecase "Iniciar sesion" as UC_Login
+usecase "Agendar cita" as UC_Agendar
+usecase "Cancelar cita" as UC_Cancelar
+usecase "Listar mis citas" as UC_MisCitas
+usecase "Listar citas" as UC_Listar
+usecase "Listar citas por cedula" as UC_Cedula
+usecase "Exportar citas CSV" as UC_Exportar
+usecase "Gestionar pacientes" as UC_Pacientes
+usecase "Gestionar disponibilidad" as UC_Disponibilidad
+usecase "Gestionar agendadores" as UC_Agendadores
+usecase "Gestionar especialidades y profesionales" as UC_Catalogos
+usecase "Configurar agendamiento" as UC_Configurar
+
+Paciente --> UC_Registrarse
+Paciente --> UC_Login
+Paciente --> UC_Agendar
+Paciente --> UC_Cancelar
+Paciente --> UC_MisCitas
+
+Agendador --> UC_Login
+Agendador --> UC_Agendar
+Agendador --> UC_Listar
+Agendador --> UC_Cedula
+Agendador --> UC_Exportar
+Agendador --> UC_Pacientes
+
+Profesional --> UC_Login
+Profesional --> UC_Listar
+Profesional --> UC_Cedula
+Profesional --> UC_Exportar
+Profesional --> UC_Disponibilidad
+
+Administrador --> UC_Login
+Administrador --> UC_Agendadores
+Administrador --> UC_Catalogos
+Administrador --> UC_Configurar
+
+UC_Login --> KC : OpenID Connect
+UC_Registrarse --> KC : crea la cuenta
+@enduml

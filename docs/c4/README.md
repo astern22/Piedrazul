@@ -3,32 +3,43 @@
 Documentacion de arquitectura usando el modelo C4.
 
 ## 1. Contexto del Sistema
+
 ![alt](contexto.svg)
 
 ## 2. Contenedores
-![alt](contenedores.svg)
+
+![alt](contenedores.jpg)
 
 ## 3. Componentes
+
 ### Backend
-![alt](componente_API.svg)
+
+![alt](componente_API.jpg)
 
 ### Frontend
+
 ![alt](componente_front.svg)
 
 ### Base de Datos
-![alt](componente_bd.svg)
+
+![alt](componente_bd.jpg)
 
 ### Modulo Agendamiento
+
 ![alt](componente_agendamiento.svg)
 
 ### Modulo Citas
+
 ![alt](componente_citas.svg)
 
 ### Modulo Profesionales
+
 ![alt](componente_profesionales.svg)
 
 ### Modulo Usuarios
+
 ![alt](componente_auth.svg)
 
 ### Seguridad
-![alt](componente_seguridad.svg)
+
+![alt](componente_seguridad.jpg)

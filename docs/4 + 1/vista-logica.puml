@@ -1,0 +1,77 @@
+@startuml
+!pragma layout elk
+skinparam linetype ortho
+title Vista Logica
+
+class User {
+  - id: Long
+  - username: String
+  - password: String
+  - keycloakUserId: String
+  - fullName: String
+  - email: String
+  - enabled: boolean
+}
+
+class Role {
+  - id: Long
+  - name: String
+}
+
+class Patient {
+  - id: Long
+  - userId: Long
+  - documentNumber: String
+  - phone: String
+  - birthDate: LocalDate
+}
+
+class Professional {
+  - id: Long
+  - userId: Long
+  - specialtyId: Long
+  - appointmentIntervalMinutes: Integer
+  - active: boolean
+}
+
+class Specialty {
+  - id: Long
+  - name: String
+}
+
+class WeeklyAvailability {
+  - id: Long
+  - professionalId: Long
+  - dayOfWeek: Integer
+  - startTime: LocalTime
+  - endTime: LocalTime
+  - active: boolean
+}
+
+class Appointment {
+  - id: Long
+  - patientId: Long
+  - professionalId: Long
+  - appointmentDate: LocalDate
+  - startTime: LocalTime
+  - endTime: LocalTime
+  - status: String
+  - cancellationReason: String
+  - createdAt: LocalDateTime
+}
+
+class KeycloakUser <<external>> {
+  - id: String
+  - username: String
+  - roles: String[]
+}
+
+User "*" -- "*" Role
+User "1" -- "0..1" Professional
+User "0..1" -- "0..1" Patient
+User "1" -- "1" KeycloakUser : keycloak_user_id
+Professional "*" -- "1" Specialty
+WeeklyAvailability "*" -- "1" Professional
+Appointment "*" -- "1" Patient
+Appointment "*" -- "1" Professional
+@enduml

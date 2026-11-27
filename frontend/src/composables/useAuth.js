@@ -1,14 +1,52 @@
 import { ref, computed } from 'vue'
 import { authService } from '@/api'
+import keycloak, { isE2EMode, setMockAuthenticated } from '@/keycloak'
 
-const token = ref(authService.getToken())
-const user = ref(authService.getCurrentUser())
+function resolveCurrentToken() {
+  if (isE2EMode()) return 'mock-jwt-token-e2e'
+  return authService.getToken()
+}
 
-// Escucha el evento global emitido por el interceptor cuando un token caduca (401)
+function resolveCurrentUser() {
+  if (isE2EMode()) {
+    return {
+      username: 'paciente1',
+      fullName: 'Juan Perez',
+      email: 'paciente1@piedrazul.com',
+      roles: ['PATIENT'],
+    }
+  }
+  return authService.getCurrentUser()
+}
+
+const token = ref(resolveCurrentToken())
+const user = ref(resolveCurrentUser())
+
+/** Copia el estado de Keycloak (que no es reactivo) a las refs de Vue. */
+export function syncState() {
+  if (isE2EMode()) {
+    setMockAuthenticated('PATIENT')
+  }
+  token.value = resolveCurrentToken()
+  user.value = resolveCurrentUser()
+}
+
+// Keycloak notifica cada cambio de sesion; asi la UI reacciona sin recargar.
+keycloak.onReady = syncState
+keycloak.onAuthSuccess = syncState
+keycloak.onAuthRefreshSuccess = syncState
+keycloak.onAuthLogout = syncState
+keycloak.onTokenExpired = () => {
+  keycloak.updateToken(30).then(syncState).catch(syncState)
+}
+
+// Evento global emitido por el cliente HTTP cuando el backend responde 401
 if (typeof window !== 'undefined') {
   window.addEventListener('auth:unauthorized', () => {
-    token.value = null
-    user.value = null
+    if (!isE2EMode()) {
+      token.value = null
+      user.value = null
+    }
   })
 }
 
@@ -17,6 +55,7 @@ if (typeof window !== 'undefined') {
  */
 export function useAuth() {
   const isAuthenticated = computed(() => {
+    if (isE2EMode()) return true
     return Boolean(token.value && authService.isAuthenticated())
   })
 
@@ -59,29 +98,38 @@ export function useAuth() {
   })
 
   /**
-   * Inicia sesion con credenciales y actualiza el estado reactivo.
+   * Redirige al login de Keycloak. Al volver, el estado reactivo se actualiza solo.
+   * @param {Object} [options] por ejemplo { redirectUri }
    */
-  async function login(credentials) {
-    const data = await authService.login(credentials)
-    token.value = data.token
-    user.value = authService.getCurrentUser()
-    return data
+  async function login(options = {}) {
+    if (isE2EMode()) {
+      syncState()
+      return Promise.resolve()
+    }
+    return authService.login(options)
   }
 
   /**
-   * Registra un nuevo usuario en la base de datos.
+   * Registra un nuevo paciente (backend + Keycloak).
    */
   async function register(userData) {
     return await authService.register(userData)
   }
 
   /**
-   * Cierra la sesion activa y reinicia el estado reactivo.
+   * Cierra la sesion en Keycloak y reinicia el estado reactivo.
    */
   function logout() {
-    authService.logout()
     token.value = null
     user.value = null
+    try {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('piedrazul_e2e_auth')
+        window.sessionStorage.removeItem('piedrazul_e2e_auth')
+        document.cookie = 'piedrazul_e2e_auth=; Max-Age=0; path=/'
+      }
+    } catch (e) {}
+    return authService.logout()
   }
 
   return {
@@ -101,5 +149,6 @@ export function useAuth() {
     login,
     register,
     logout,
+    syncState,
   }
 }

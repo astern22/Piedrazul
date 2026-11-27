@@ -1,0 +1,26 @@
+@startuml
+!pragma layout elk
+skinparam linetype ortho
+title Vista Fisica
+
+rectangle "Navegador" as nav {
+  component "SPA Vue 3\n(keycloak-js)" as spa
+}
+
+rectangle "Servidor de aplicaciones" as app {
+  component "API REST Spring Boot\n:8080" as api
+}
+
+rectangle "Servidor de identidad" as kcnode {
+  component "Keycloak 26.4\n:8081" as kc
+}
+
+database "PostgreSQL\npiedrazuldb :5432" as db
+database "PostgreSQL\nkeycloak :5432" as kcdb
+
+nav --> app : HTTPS/JSON + Bearer JWT
+nav --> kcnode : OIDC (Authorization Code + PKCE)
+app --> kcnode : JWKS / Admin API
+app --> db : JDBC
+kcnode --> kcdb : JDBC
+@enduml

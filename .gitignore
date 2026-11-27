@@ -4,6 +4,14 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 infra/
+
+# Test outputs
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+.env
+_to_delete/
 ### STS ###
 .apt_generated
 .classpath
@@ -31,3 +39,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+infra/
+
+# Test outputs
+node_modules/
+test-results/
+playwright-report/
+blob-report/
